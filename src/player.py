@@ -1,6 +1,7 @@
 import pygame
 import os
 import random
+import math
 from settings import *
 
 class Player(pygame.sprite.Sprite):
@@ -148,6 +149,23 @@ class Player(pygame.sprite.Sprite):
         if healed > 0:
             print(f"💚 回复 {healed} HP！当前 HP: {self.hp}")
         return healed
+
+    # member3 
+    def draw_healing_aura(self, screen):
+        """Member 3 专属：绘制绿色呼吸治疗光环"""
+        if self.is_healing:
+            import math
+            # 利用正弦波让光环半径在 35~40 之间平滑呼吸 [cite: 207]
+            radius = 35 + int(5 * math.sin(pygame.time.get_ticks() * 0.005))
+            
+            # 创建一个支持透明度的表面
+            aura_surface = pygame.Surface((100, 100), pygame.SRCALPHA)
+            
+            # 绘制柔和黄色的圆环
+            pygame.draw.circle(aura_surface, (255, 255, 0, 150), (50, 50), radius, 4)
+            
+            # 根据玩家当前的中心点绘制到屏幕上
+            screen.blit(aura_surface, (self.rect.centerx - 50, self.rect.centery - 50))
 
     def attack(self):
         if self.is_dead:
@@ -305,18 +323,19 @@ class Player(pygame.sprite.Sprite):
         # ==========================================
         # 9. 被动回血
         # ==========================================
-        self.is_healing = False
-        
+        # member 3
+        # 你的判定逻辑：没有按左右键，在地面上，没在飞
         is_idle = (not keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT] 
-                   and self.is_on_ground and not self.is_flying)
-        
+                   and self.is_on_ground and not getattr(self, 'is_flying', False))
+
         if is_idle and self.hp < self.max_hp:
             self.idle_timer += 1
-            if self.idle_timer >= IDLE_HEAL_DELAY:
+            # 180 帧 = 3 秒 (假设游戏运行在 60 FPS) [cite: 150]
+            if self.idle_timer >= 180:
                 self.is_healing = True
-                if self.idle_timer % 12 == 0:
-                    self.heal(1)
-                    self.create_heal_particles()
+                # 每 60 帧 (1秒) 恢复 5 HP [cite: 150]
+                if self.idle_timer % 60 == 0:
+                    self.heal(5)
         else:
             self.idle_timer = 0
             self.is_healing = False
@@ -413,35 +432,6 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom > GROUND_Y:
             self.rect.bottom = GROUND_Y
             self.vy = 0
-
-    def create_heal_particles(self):
-        for _ in range(3):
-            self.heal_particles.append({
-                'x': self.rect.centerx + random.randint(-30, 30),
-                'y': self.rect.centery + random.randint(-30, 30),
-                'life': 30,
-                'max_life': 30,
-                'size': random.randint(3, 8),
-                'vx': random.uniform(-1, 1),
-                'vy': random.uniform(-2, -0.5),
-                'color': (100, 255, 100)
-            })
-        
-        for p in self.heal_particles[:]:
-            p['life'] -= 1
-            p['x'] += p['vx']
-            p['y'] += p['vy']
-            p['vy'] += 0.05
-            if p['life'] <= 0:
-                self.heal_particles.remove(p)
-
-    def draw_heal_particles(self, screen):
-        for p in self.heal_particles:
-            alpha = int(255 * (p['life'] / p['max_life']))
-            color = (p['color'][0], p['color'][1], p['color'][2], alpha)
-            size = p['size'] * (p['life'] / p['max_life'])
-            if size > 1:
-                pygame.draw.circle(screen, color[:3], (int(p['x']), int(p['y'])), int(size))
 
     def get_fly_progress(self):
         return self.fly_timer / self.max_fly_time

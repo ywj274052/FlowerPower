@@ -625,7 +625,10 @@ def main():
                     seed.draw_trail(screen)
                 for seed in player.seed_shots:
                     screen.blit(seed.image, seed.rect)
-                player.draw_heal_particles(screen)
+                    
+                #member 3
+                player.draw_healing_aura(screen)
+
                 screen.blit(player.image, player.rect)
                 if player.is_attacking:
                     hitbox = player.create_attack_hitbox()
