@@ -293,7 +293,7 @@ def draw_ui(screen, player):
         small_font = pygame.font.SysFont("Arial", 24)
     
     # ==========================================
-    # ⭐ HP 条
+    # HP 条
     # ==========================================
     hp_bar_width = 300
     hp_bar_height = 25
@@ -391,23 +391,20 @@ def draw_tutorial_text(screen):
     
     # 半透明背景
     bg_width = 400
-    bg_height = 180
+    bg_height = 210
     bg_x = SCREEN_WIDTH // 2 - bg_width // 2
-    bg_y = SCREEN_HEIGHT - 200
+    bg_y = SCREEN_HEIGHT - 230
     
-    # 背景框
     bg_surface = pygame.Surface((bg_width, bg_height), pygame.SRCALPHA)
     bg_surface.fill((0, 0, 0, 160))
     pygame.draw.rect(bg_surface, (255, 255, 255, 60), (0, 0, bg_width, bg_height), 2)
     screen.blit(bg_surface, (bg_x, bg_y))
     
-    # 标题
     title_text = font.render("🎮 Controls", True, (255, 215, 0))
     screen.blit(title_text, (bg_x + 20, bg_y + 10))
     
-    # 操作提示
     controls = [
-        ("←/→", "Move"),
+        ("<-/->", "Move"),
         ("Space", "Jump"),
         ("W", "Fly"),
         ("X", "Seed Shot (Ranged)")
@@ -415,21 +412,20 @@ def draw_tutorial_text(screen):
     
     y_offset = 50
     for key, action in controls:
-        # 按键（金色）
         key_text = small_font.render(key, True, (255, 200, 50))
         screen.blit(key_text, (bg_x + 20, bg_y + y_offset))
-        
-        # 动作（白色）
         action_text = small_font.render(f"→ {action}", True, (220, 220, 220))
         screen.blit(action_text, (bg_x + 100, bg_y + y_offset))
-        
         y_offset += 25
     
-    # 闪烁提示：按 H 测试受伤
     alpha = 100 + int(155 * abs(math.sin(pygame.time.get_ticks() / 500)))
     hint_text = small_font.render("Press H to test damage", True, (255, 100, 100))
     hint_text.set_alpha(alpha)
-    screen.blit(hint_text, (bg_x + 20, bg_y + y_offset + 5))       
+    screen.blit(hint_text, (bg_x + 20, bg_y + y_offset + 5))
+    
+    # ⭐ 按 O 键开关教程
+    toggle_text = small_font.render("Press O to toggle this tutorial", True, (200, 200, 200))
+    screen.blit(toggle_text, (bg_x + 20, bg_y + y_offset + 30))
 
 def draw_game_over_screen(screen, player):
     """绘制 Game Over 画面"""
@@ -480,13 +476,14 @@ def draw_game_over_screen(screen, player):
 
 # ---------- 主函数 ----------
 def main():
+    # 所有 global 声明放在最开头
+    global game_state, tutorial_timer, show_tutorial
+    
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("FlowerPower")
     clock = pygame.time.Clock()
     
-    global game_state, tutorial_timer, show_tutorial 
-
     tutorial_timer = 0
     show_tutorial = True
     
@@ -507,25 +504,38 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
 
-                # ⭐ Game Over 状态：按 R 重启
+                # 按 O 键开关教程文字
+                if event.key == pygame.K_o and game_state == "PLAYING":
+                    show_tutorial = not show_tutorial
+                    if show_tutorial:
+                        print("📖 教程文字已开启")
+                        tutorial_timer = 0
+                    else:
+                        print("📖 教程文字已关闭")
+
+                # Game Over 状态：按 R 重启
                 if game_state == "GAME_OVER" and event.key == pygame.K_r:
                     print("🔄 重新开始游戏！")
                     game_state = "TITLE"
                     player = None
                     comet = None
+                    show_tutorial = True
+                    tutorial_timer = 0
 
                 if event.key == pygame.K_h and game_state == "PLAYING":
                     if player:
                         result = player.take_damage(10)
                         if result == "GAME_OVER":
                             print("💀 玩家死亡！游戏结束！")
-                            game_state = "GAME_OVER"  # ⭐ 切换到 Game Over 状态
+                            game_state = "GAME_OVER"
                 
                 if game_state == "TITLE" and event.key == pygame.K_RETURN:
                     print("☄️ 彗星坠落事件启动！")
                     game_state = "COMET"
                     comet = Comet()
                     player = Player(100, GROUND_Y - 128)
+                    show_tutorial = True
+                    tutorial_timer = 0
         
         # ----- 更新 -----
         if game_state == "COMET":
@@ -545,12 +555,12 @@ def main():
         elif game_state == "PLAYING":
             if player:
                 player.update()
-
+                
                 if show_tutorial:
                     tutorial_timer += 1
-                    if tutorial_timer >= 300:  # 5秒（60fps × 5）
+                    if tutorial_timer >= 600:
                         show_tutorial = False
-                # 如果玩家死亡，切换到 Game Over
+                
                 if player.is_dead:
                     game_state = "GAME_OVER"
         
@@ -581,14 +591,11 @@ def main():
                     hitbox = player.create_attack_hitbox()
                     pygame.draw.rect(screen, RED, hitbox, 2)
                 draw_ui(screen, player)
-
-                 # 画教程文字（游戏开始时显示）
+                
                 if show_tutorial:
                     draw_tutorial_text(screen)
         
-        #  Game Over 画面 
         elif game_state == "GAME_OVER":
-            # 保留游戏背景
             screen.blit(background, (0, 0))
             pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
             if player:
@@ -600,7 +607,6 @@ def main():
     
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()
