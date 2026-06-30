@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import random
+import os
 from settings import *
 from player import Player, SeedShot
 
@@ -283,17 +284,23 @@ def draw_shake_effect(screen, background, comet, shake_frames):
         screen.blit(impact_text, impact_rect)
 
 
-def draw_ui(screen, player):
-    """绘制UI（HP条、弹药、飞行能量）"""
+def draw_ui(screen, player, score):
+    """绘制UI（HP条、弹药、飞行能量、分数） - 整合了 Member 3 的任务"""
     try:
+        # 使用基础英文字体，加粗使其更清晰
+        font = pygame.font.SysFont("arial", 36, bold=True)
+        small_font = pygame.font.SysFont("arial", 24, bold=True)
+    except:
         font = pygame.font.Font(None, 36)
         small_font = pygame.font.Font(None, 24)
-    except:
-        font = pygame.font.SysFont("Arial", 36)
-        small_font = pygame.font.SysFont("Arial", 24)
     
+    # 提取预设颜色 (确保文件开头定义了这些常量)
+    WHITE = (255, 255, 255)
+    BLUE = (0, 0, 255)
+    LIGHT_GREEN = (144, 238, 144)
+
     # ==========================================
-    # HP 条
+    # 1. HP 条 (Member 3 任务)
     # ==========================================
     hp_bar_width = 300
     hp_bar_height = 25
@@ -306,7 +313,7 @@ def draw_ui(screen, player):
     # HP 颜色（绿色 → 黄色 → 红色）
     hp_progress = player.get_hp_progress()
     if hp_progress > 0.5:
-        color = (0, 255, 0)  # 绿色
+        color = (50, 205, 50)  # 绿色
     elif hp_progress > 0.25:
         color = (255, 255, 0)  # 黄色
     else:
@@ -319,17 +326,24 @@ def draw_ui(screen, player):
     # 边框
     pygame.draw.rect(screen, WHITE, (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), 2)
     
-    # HP 文字
-    hp_text = font.render(f"❤️ HP: {player.hp}/{player.max_hp}", True, WHITE)
+    # HP 文字 (移除了导致乱码的 Emoji)
+    hp_text = font.render(f"HP: {player.hp}/{player.max_hp}", True, WHITE)
     screen.blit(hp_text, (hp_bar_x + 10, hp_bar_y + 2))
     
     # HP 百分比（右侧）
     percent_text = small_font.render(f"{player.get_hp_percent()}%", True, WHITE)
     percent_rect = percent_text.get_rect(right=hp_bar_x + hp_bar_width - 10, centery=hp_bar_y + hp_bar_height // 2)
     screen.blit(percent_text, percent_rect)
+
+    # ==========================================
+    # 2. 分数显示 (Member 3 专属任务)
+    # ==========================================
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    score_rect = score_text.get_rect(topright=(screen.get_width() - 20, 20))
+    screen.blit(score_text, score_rect)
     
     # ==========================================
-    # 飞行能量条（放在 HP 条下方）
+    # 3. 飞行能量条（保留 Member 1 的逻辑，移除 Emoji）
     # ==========================================
     fly_bar_width = 150
     fly_bar_height = 15
@@ -348,37 +362,59 @@ def draw_ui(screen, player):
         pygame.draw.rect(screen, color, (fly_bar_x + 2, fly_bar_y + 2, fill_width - 4, fly_bar_height - 4))
     
     pygame.draw.rect(screen, WHITE, (fly_bar_x, fly_bar_y, fly_bar_width, fly_bar_height), 2)
-    fly_text = small_font.render("✈️ FLY", True, WHITE)
+    fly_text = small_font.render("FLY", True, WHITE)
     screen.blit(fly_text, (fly_bar_x + 5, fly_bar_y - 1))
     
-    # 飞行状态
     if player.is_flying:
-        status_text = small_font.render("✈️ FLYING", True, (100, 200, 255))
+        status_text = small_font.render("FLYING", True, (100, 200, 255))
         screen.blit(status_text, (fly_bar_x + fly_bar_width + 10, fly_bar_y - 2))
     
     # ==========================================
-    # 种子弹药
+    # 4. 种子弹药 (移除 Emoji)
     # ==========================================
     seed_y = fly_bar_y + fly_bar_height + 15
-    seed_text = font.render(f"🌱 Seeds: {player.seed_count}/{SEED_SHOT_MAX}", True, WHITE)
+    # 假设主文件里定义了全局变量 SEED_SHOT_MAX
+    # 如果报错，可以直接改成固定的 3
+    seed_text = font.render(f"Seeds: {player.seed_count}/3", True, WHITE) 
     screen.blit(seed_text, (20, seed_y))
     
     # ==========================================
-    # 回血状态
+    # 5. 回血状态 (移除 Emoji)
     # ==========================================
     if player.is_healing:
-        heal_text = small_font.render("💚 Healing...", True, LIGHT_GREEN)
+        heal_text = small_font.render("Healing...", True, LIGHT_GREEN)
         screen.blit(heal_text, (20, seed_y + 35))
     
     # ==========================================
-    # 受伤闪红边框（低血量时）
+    # 6. 受伤闪红边框 (保留 Member 1 逻辑)
     # ==========================================
     if player.get_hp_progress() < 0.25 and not player.is_healing:
-        # 红色闪烁警告边框
         alpha = 50 + int(50 * abs(pygame.time.get_ticks() / 200 % 2 - 1))
-        warning = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        # 根据屏幕大小生成警告层
+        warning = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
         warning.fill((255, 0, 0, alpha))
         screen.blit(warning, (0, 0))
+
+# member3 bgm function
+def play_level_bgm(level_num):
+    """根据关卡编号切换并循环播放背景音乐"""
+    # 自动获取 main.py 的上一级目录 (也就是 FlowerPower 根目录)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    # 自动拼接绝对路径，兼容 Windows 和 Mac
+    bgm_tracks = {
+        1: os.path.join(base_dir, "assets", "audio", "bgm_level1.ogg"),
+        2: os.path.join(base_dir, "assets", "audio", "bgm_level2.ogg"),
+        3: os.path.join(base_dir, "assets", "audio", "bgm_level3.ogg"),
+        4: os.path.join(base_dir, "assets", "audio", "bgm_level4.ogg")
+    }
+    
+    if level_num in bgm_tracks:
+        try:
+            pygame.mixer.music.load(bgm_tracks[level_num])
+            pygame.mixer.music.play(-1)  # -1 代表无限循环
+        except pygame.error as e:
+            print(f"BGM 加载失败，请检查路径: {e}")
 
 def draw_tutorial_text(screen):
     """绘制教程文字（游戏开始时显示）"""
@@ -480,6 +516,7 @@ def main():
     global game_state, tutorial_timer, show_tutorial
     
     pygame.init()
+    pygame.mixer.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("FlowerPower")
     clock = pygame.time.Clock()
@@ -493,6 +530,8 @@ def main():
     player = None
     comet = None
     shake_frames = 0
+
+    score = 0
     
     running = True
     while running:
@@ -551,6 +590,7 @@ def main():
             if shake_frames <= 0:
                 print("🎮 游戏开始！")
                 game_state = "PLAYING"
+                play_level_bgm(1) #member3 music
         
         elif game_state == "PLAYING":
             if player:
@@ -590,7 +630,7 @@ def main():
                 if player.is_attacking:
                     hitbox = player.create_attack_hitbox()
                     pygame.draw.rect(screen, RED, hitbox, 2)
-                draw_ui(screen, player)
+                draw_ui(screen, player, score)
                 
                 if show_tutorial:
                     draw_tutorial_text(screen)
