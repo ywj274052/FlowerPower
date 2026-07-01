@@ -514,7 +514,7 @@ def draw_game_over_screen(screen, player):
 # ---------- 主函数 ----------
 def main():
     # 所有 global 声明放在最开头
-    global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y, camera_locked, current_wave, enemies
+    global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y, camera_locked, current_wave, enemies, level_progress
     
     pygame.init()
     pygame.mixer.init()
@@ -600,10 +600,11 @@ def main():
                     poison_zones.add(zone1, zone2)
                     # --- [新增/修改部分结束] ---
 
-                    # --- [新增] 波次控制与敌人系统 ---
+                    # --- [修改] 波次控制与敌人系统 ---
                     camera_locked = False
-                    current_wave = 0   # 0代表还没触发，1-4代表怪物波数，5代表通关解锁
-                    enemies = pygame.sprite.Group() # 专门存放当前屏幕里的敌人
+                    current_wave = 1      # 从第 1 波开始准备
+                    level_progress = 0    # 【新增】用来记录你在这一关总共往前走了多远
+                    enemies.empty()       # 传送时清空旧怪物，防止 Bug
                     # --------------------------------
 
                     # 加载你的沼泽背景，并强制缩放到 1280x720 适应屏幕
@@ -656,59 +657,58 @@ def main():
                     keys = pygame.key.get_pressed()
                     if keys[pygame.K_RIGHT] and not camera_locked:
                         bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
+                        level_progress += 3  # 【新增这一行】记录累计行走距离
 
                         # 关键：让所有的毒沼泽陷阱跟着背景一起向左后退！
                         # 这样在视觉上，陷阱就死死钉在背景地面上了
                         for zone in poison_zones:
                             zone.rect.x -= 3
 
-                    # [新增] 触发点：走了大约 800 像素，且是还没触发过的状态 (wave 0)
-                    if bg_x <= -800 and current_wave == 0:
-                        camera_locked = True
-                        current_wave = 1
-                        print("🔒 触发警报！屏幕锁定，怪物出现！")
-
-                    # [新增] 怪物波次控制器
-                    if current_level == 3 and camera_locked:
-                        enemies.update(player)
-            
-                        # 检测清场（屏幕上没怪了）
+                   # ==========================================
+                # 【全新波次管理器】走 -> 锁屏打怪 -> 解锁 -> 走
+                # ==========================================
+                if current_level == 3:
+                    VISUAL_GROUND = GROUND_Y - 35
+                
+                    # 不管锁没锁屏，只要屏幕上有怪（或者毒刺），就更新它们
+                    enemies.update(player)
+                
+                    # 状态 A：没锁屏，玩家在跑图。到达指定距离就触发锁屏和刷怪
+                    if not camera_locked:
+                        if level_progress >= 800 and current_wave == 1:
+                            camera_locked = True
+                            print("🔒 触发警报！第 1 区域锁定！")
+                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                        
+                        elif level_progress >= 1600 and current_wave == 2:
+                            camera_locked = True
+                            print("🔒 触发警报！第 2 区域锁定！")
+                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            enemies.add(SwampMoth(player.rect.x - 300, VISUAL_GROUND - 150))
+                        
+                        elif level_progress >= 2400 and current_wave == 3:
+                            camera_locked = True
+                            print("🔒 触发警报！第 3 区域锁定！")
+                            enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
+                            enemies.add(PoisonToad(player.rect.x + 450, VISUAL_GROUND))
+                        
+                        elif level_progress >= 3200 and current_wave == 4:
+                            camera_locked = True
+                            print("⚠️ 最终区域锁定! Boss 降临！")
+                            enemies.add(PoisonToad(player.rect.x - 400, VISUAL_GROUND))
+                            enemies.add(PoisonToad(player.rect.x + 400, VISUAL_GROUND))
+                        
+                    # 状态 B：已锁屏，玩家在战斗。怪物全死光就解锁
+                    else:
                         if len(enemies) == 0:
-
-                            # [新增] 定义一个视觉地面高度，往上抬 35 像素
-                            VISUAL_GROUND = GROUND_Y - 35
-
-                            if current_wave == 1:
-                                print("⚔️ 第 1 波：刷出 1 种小怪")
-                                # 左右各刷一只软泥怪 (以玩家当前的 x 坐标为中心向外推)
-                                enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                                enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
-                                current_wave += 1
-                    
-                            elif current_wave == 2:
-                                print("⚔️ 第 2 波：刷出 2 种小怪")
-                                enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                                # 飞蛾刷在半空中 (GROUND_Y - 150)
-                                enemies.add(SwampMoth(player.rect.x - 300, VISUAL_GROUND - 150))
-                                current_wave += 1
-                    
-                            elif current_wave == 3:
-                                print("⚔️ 第 3 波：刷出 3 种小怪")
-                                enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
-                                enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
-                                enemies.add(PoisonToad(player.rect.x + 450, VISUAL_GROUND))
-                                current_wave += 1
-                    
-                            elif current_wave == 4:
-                                print("⚠️ 警告！最终波：中型 Boss Rot Shaman 降临！")
-                                # 目前还没写 Boss，先用两只毒蟾蜍代替测试！
-                                enemies.add(PoisonToad(player.rect.x - 400, VISUAL_GROUND))
-                                enemies.add(PoisonToad(player.rect.x + 400, VISUAL_GROUND))
-                                current_wave += 1
-                    
-                            elif current_wave > 4:
-                                print("🔓 区域肃清！解除锁定！")
-                                camera_locked = False  # 打完 Boss，解开屏幕，继续往前走
+                            camera_locked = False
+                            current_wave += 1
+                            if current_wave > 4:
+                                print("🎉 沼泽区域完全肃清！准备进入下一关！")
+                            else:
+                                print("🔓 区域肃清！屏幕解锁，继续前进！")
                     
                     # 关键：当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
                     if bg_x <= -1280:
