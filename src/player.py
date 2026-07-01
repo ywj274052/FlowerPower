@@ -155,7 +155,7 @@ class Player(pygame.sprite.Sprite):
         """Member 3 专属：绘制绿色呼吸治疗光环"""
         if self.is_healing:
             import math
-            # 利用正弦波让光环半径在 35~40 之间平滑呼吸 [cite: 207]
+            # 利用正弦波让光环半径在 35~40 之间平滑呼吸
             radius = 35 + int(5 * math.sin(pygame.time.get_ticks() * 0.005))
             
             # 创建一个支持透明度的表面
@@ -229,8 +229,10 @@ class Player(pygame.sprite.Sprite):
         self.rect.y += self.vy
         
         self.is_on_ground = False
-        if self.rect.bottom >= GROUND_Y:
-            self.rect.bottom = GROUND_Y
+        # 增加一个判断：如果 player 自己有 ground_y 属性，就用自己的；否则才用全局的 GROUND_Y
+        target_ground = getattr(self, 'ground_y', GROUND_Y)
+        if self.rect.bottom >= target_ground:
+            self.rect.bottom = target_ground
             self.vy = 0
             self.is_on_ground = True
             self.is_jumping = False
@@ -330,10 +332,10 @@ class Player(pygame.sprite.Sprite):
 
         if is_idle and self.hp < self.max_hp:
             self.idle_timer += 1
-            # 180 帧 = 3 秒 (假设游戏运行在 60 FPS) [cite: 150]
+            # 180 帧 = 3 秒 (假设游戏运行在 60 FPS)
             if self.idle_timer >= 180:
                 self.is_healing = True
-                # 每 60 帧 (1秒) 恢复 5 HP [cite: 150]
+                # 每 60 帧 (1秒) 恢复 5 HP
                 if self.idle_timer % 60 == 0:
                     self.heal(5)
         else:

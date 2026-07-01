@@ -5,6 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
+from level3_elements import PoisonZone
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -283,7 +284,7 @@ def draw_shake_effect(screen, background, comet, shake_frames):
         impact_rect = impact_text.get_rect(center=(SCREEN_WIDTH // 2, 200))
         screen.blit(impact_text, impact_rect)
 
-
+#member 3 UI, HP
 def draw_ui(screen, player, score):
     """绘制UI（HP条、弹药、飞行能量、分数） - 整合了 Member 3 的任务"""
     try:
@@ -513,7 +514,7 @@ def draw_game_over_screen(screen, player):
 # ---------- 主函数 ----------
 def main():
     # 所有 global 声明放在最开头
-    global game_state, tutorial_timer, show_tutorial
+    global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y
     
     pygame.init()
     pygame.mixer.init()
@@ -532,6 +533,13 @@ def main():
     shake_frames = 0
 
     score = 0
+    current_level = 1  # [新增] 游戏默认从第一关开始
+
+    # [新增] Member 3: 实例化毒沼泽
+    # 注意：确保在 main.py 最上方已经 from level3_elements import PoisonZone
+    poison_zones = pygame.sprite.Group()
+
+    running = True
     
     running = True
     while running:
@@ -567,6 +575,39 @@ def main():
                         if result == "GAME_OVER":
                             print("💀 玩家死亡！游戏结束！")
                             game_state = "GAME_OVER"
+
+                # [新增] 开发者测试键：按数字键 3 传送到 Level 3
+                if event.key == pygame.K_3 and game_state == "PLAYING":
+
+                    current_level = 3
+                    print("🌀 开发者模式：已传送到 Level 3 - 沼泽废墟！")
+                    play_level_bgm(3) # 瞬间切换成你的沼泽 BGM！
+
+                    # --- [新增/修改部分开始] ---
+                    # 1. 动态调低物理地面的高度
+                    GROUND_Y = 670
+
+                    # 【关键 3】强制让玩家落到新的地面上
+                    # 假设 Member 1 的 Player 类的碰撞箱底部是对齐地面的
+                    if player:
+                        player.ground_y = 670  # <--- 直接设置玩家的 ground_y 属性
+                        player.rect.bottom = 670
+                
+                    # 2. 在进入关卡时生成陷阱，这样它们就会贴合新的 GROUND_Y
+                    # 可以把陷阱放远一点（比如 x=800 和 x=1200），等你跑过去再出现
+                    poison_zones.empty() # 清空之前在代码顶部的旧陷阱
+                    zone1 = PoisonZone(800, GROUND_Y - 20, 200, 20)
+                    zone2 = PoisonZone(1200, GROUND_Y - 20, 150, 20)
+                    poison_zones.add(zone1, zone2)
+                    # --- [新增/修改部分结束] ---
+
+                    # 加载你的沼泽背景，并强制缩放到 1280x720 适应屏幕
+                    swamp_bg = pygame.image.load("assets/sprites/backgrounds/1_game_background.png").convert()
+                    swamp_bg = pygame.transform.scale(swamp_bg, (1280, 720))
+    
+                    # 增加两个控制背景滚动的核心变量
+                    bg_x = 0                # 背景当前的 X 坐标
+                    camera_locked = False   # 锁屏机制的“锁”
                 
                 if game_state == "TITLE" and event.key == pygame.K_RETURN:
                     print("☄️ 彗星坠落事件启动！")
@@ -575,6 +616,8 @@ def main():
                     player = Player(100, GROUND_Y - 128)
                     show_tutorial = True
                     tutorial_timer = 0
+                
+
         
         # ----- 更新 -----
         if game_state == "COMET":
@@ -595,6 +638,28 @@ def main():
         elif game_state == "PLAYING":
             if player:
                 player.update()
+
+                # [新增] Member 3: 毒沼泽伤害检测
+                if current_level == 3:
+                    poison_zones.update(player)
+
+                # [新增] 背景滚动与锁屏逻辑
+                if current_level == 3:
+                # 假设玩家按了右键且相机没被锁住，背景向左移动
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_RIGHT] and not camera_locked:
+                        bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
+
+                        # --- [新增这一段] ---
+                        # 关键：让所有的毒沼泽陷阱跟着背景一起向左后退！
+                        # 这样在视觉上，陷阱就死死钉在背景地面上了
+                        for zone in poison_zones:
+                            zone.rect.x -= 3
+                    # -------------------
+                    
+                    # 关键：当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
+                    if bg_x <= -1280:
+                        bg_x = 0
                 
                 if show_tutorial:
                     tutorial_timer += 1
@@ -619,6 +684,15 @@ def main():
         elif game_state == "PLAYING":
             screen.blit(background, (0, 0))
             pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
+
+            # [新增] Member 3: 绘制毒沼泽
+            if current_level == 3:
+                # 画第一张图
+                screen.blit(swamp_bg, (bg_x, 0))
+                # 画第二张图，紧紧贴在第一张图的右边
+                screen.blit(swamp_bg, (bg_x + 1280, 0))
+                for zone in poison_zones:
+                    zone.draw(screen)
             
             if player:
                 for seed in player.seed_shots:
