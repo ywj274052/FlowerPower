@@ -5,7 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
-from level3_elements import PoisonZone
+from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -514,7 +514,7 @@ def draw_game_over_screen(screen, player):
 # ---------- 主函数 ----------
 def main():
     # 所有 global 声明放在最开头
-    global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y
+    global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y, camera_locked, current_wave, enemies
     
     pygame.init()
     pygame.mixer.init()
@@ -538,8 +538,7 @@ def main():
     # [新增] Member 3: 实例化毒沼泽
     # 注意：确保在 main.py 最上方已经 from level3_elements import PoisonZone
     poison_zones = pygame.sprite.Group()
-
-    running = True
+    enemies = pygame.sprite.Group()
     
     running = True
     while running:
@@ -601,6 +600,12 @@ def main():
                     poison_zones.add(zone1, zone2)
                     # --- [新增/修改部分结束] ---
 
+                    # --- [新增] 波次控制与敌人系统 ---
+                    camera_locked = False
+                    current_wave = 0   # 0代表还没触发，1-4代表怪物波数，5代表通关解锁
+                    enemies = pygame.sprite.Group() # 专门存放当前屏幕里的敌人
+                    # --------------------------------
+
                     # 加载你的沼泽背景，并强制缩放到 1280x720 适应屏幕
                     swamp_bg = pygame.image.load("assets/sprites/backgrounds/1_game_background.png").convert()
                     swamp_bg = pygame.transform.scale(swamp_bg, (1280, 720))
@@ -639,23 +644,71 @@ def main():
             if player:
                 player.update()
 
-                # [新增] Member 3: 毒沼泽伤害检测
+                # Member 3: 毒沼泽伤害检测
                 if current_level == 3:
                     poison_zones.update(player)
 
-                # [新增] 背景滚动与锁屏逻辑
+                
+                
+                # 背景滚动与锁屏逻辑
                 if current_level == 3:
                 # 假设玩家按了右键且相机没被锁住，背景向左移动
                     keys = pygame.key.get_pressed()
                     if keys[pygame.K_RIGHT] and not camera_locked:
                         bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
 
-                        # --- [新增这一段] ---
                         # 关键：让所有的毒沼泽陷阱跟着背景一起向左后退！
                         # 这样在视觉上，陷阱就死死钉在背景地面上了
                         for zone in poison_zones:
                             zone.rect.x -= 3
-                    # -------------------
+
+                    # [新增] 触发点：走了大约 800 像素，且是还没触发过的状态 (wave 0)
+                    if bg_x <= -800 and current_wave == 0:
+                        camera_locked = True
+                        current_wave = 1
+                        print("🔒 触发警报！屏幕锁定，怪物出现！")
+
+                    # [新增] 怪物波次控制器
+                    if current_level == 3 and camera_locked:
+                        enemies.update(player)
+            
+                        # 检测清场（屏幕上没怪了）
+                        if len(enemies) == 0:
+
+                            # [新增] 定义一个视觉地面高度，往上抬 35 像素
+                            VISUAL_GROUND = GROUND_Y - 35
+
+                            if current_wave == 1:
+                                print("⚔️ 第 1 波：刷出 1 种小怪")
+                                # 左右各刷一只软泥怪 (以玩家当前的 x 坐标为中心向外推)
+                                enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                                enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                                current_wave += 1
+                    
+                            elif current_wave == 2:
+                                print("⚔️ 第 2 波：刷出 2 种小怪")
+                                enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                                # 飞蛾刷在半空中 (GROUND_Y - 150)
+                                enemies.add(SwampMoth(player.rect.x - 300, VISUAL_GROUND - 150))
+                                current_wave += 1
+                    
+                            elif current_wave == 3:
+                                print("⚔️ 第 3 波：刷出 3 种小怪")
+                                enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                                enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
+                                enemies.add(PoisonToad(player.rect.x + 450, VISUAL_GROUND))
+                                current_wave += 1
+                    
+                            elif current_wave == 4:
+                                print("⚠️ 警告！最终波：中型 Boss Rot Shaman 降临！")
+                                # 目前还没写 Boss，先用两只毒蟾蜍代替测试！
+                                enemies.add(PoisonToad(player.rect.x - 400, VISUAL_GROUND))
+                                enemies.add(PoisonToad(player.rect.x + 400, VISUAL_GROUND))
+                                current_wave += 1
+                    
+                            elif current_wave > 4:
+                                print("🔓 区域肃清！解除锁定！")
+                                camera_locked = False  # 打完 Boss，解开屏幕，继续往前走
                     
                     # 关键：当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
                     if bg_x <= -1280:
@@ -693,12 +746,34 @@ def main():
                 screen.blit(swamp_bg, (bg_x + 1280, 0))
                 for zone in poison_zones:
                     zone.draw(screen)
+                    enemies.draw(screen)
             
             if player:
                 for seed in player.seed_shots:
                     seed.draw_trail(screen)
                 for seed in player.seed_shots:
                     screen.blit(seed.image, seed.rect)
+
+                # 【新增】远程种子(子弹)与怪物的碰撞检测
+                for enemy in enemies:
+                    # 必须用 [:] 切片来遍历，因为我们要在循环中删除击中的种子
+                    for seed in player.seed_shots[:]: 
+                        # 检测种子的矩形框是否碰到了怪物的矩形框
+                        if seed.rect.colliderect(enemy.rect):
+                    
+                            # 1. 种子击中后要销毁（从列表里删掉，防止穿透打一串）
+                            if seed in player.seed_shots:
+                                player.seed_shots.remove(seed)
+                    
+                            # 2. 怪物扣血 (假设一颗种子伤害为 10)
+                            enemy.hp -= 10
+                            print(f"🎯 种子精准命中！敌人剩余 HP: {enemy.hp}")
+                    
+                            # 3. 怪物死亡检测
+                            if enemy.hp <= 0:
+                                enemy.kill()
+                                print("💀 敌人被种子击败！")
+                                break # 这个怪死了，直接跳出内层循环，不再吃其他种子的伤害
                     
                 #member 3
                 player.draw_healing_aura(screen)
@@ -706,7 +781,24 @@ def main():
                 screen.blit(player.image, player.rect)
                 if player.is_attacking:
                     hitbox = player.create_attack_hitbox()
+
+                    # 【关键修复】强行把红框的高度往下延伸 40 像素，变成“扫地攻击”！
+                    hitbox.height += 40
+
                     pygame.draw.rect(screen, RED, hitbox, 2)
+
+                    # 【新增】遍历当前关卡的所有敌人，检测是否被红框击中
+                    for enemy in enemies:
+                        # 使用 colliderect 检测红框和敌人的矩形是否重叠
+                        if hitbox.colliderect(enemy.rect):
+                            enemy.hp -= 5  # 玩家攻击力设为 5
+                            print(f"💥 击中敌人！敌人剩余 HP: {enemy.hp}")
+                        
+                            # 如果敌人血量归零，将其从怪物组中移除
+                            if enemy.hp <= 0:
+                                enemy.kill()
+                                print("💀 敌人被击败！")
+
                 draw_ui(screen, player, score)
                 
                 if show_tutorial:
