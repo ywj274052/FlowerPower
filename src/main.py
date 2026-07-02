@@ -678,21 +678,35 @@ def main():
                         if level_progress >= 800 and current_wave == 1:
                             camera_locked = True
                             print("🔒 触发警报！第 1 区域锁定！")
+                            enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x + 600, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x - 1600, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x - 1800, VISUAL_GROUND))
                         
                         elif level_progress >= 1600 and current_wave == 2:
                             camera_locked = True
                             print("🔒 触发警报！第 2 区域锁定！")
+                            enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                            enemies.add(SwampMoth(player.rect.x - 300, VISUAL_GROUND - 150))
+                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
+                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
+                            enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 250))
+                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 350))
                         
                         elif level_progress >= 2400 and current_wave == 3:
                             camera_locked = True
                             print("🔒 触发警报！第 3 区域锁定！")
-                            enemies.add(ToxicSludge(player.rect.x - 400, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
                             enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
-                            enemies.add(PoisonToad(player.rect.x + 450, VISUAL_GROUND))
+                            enemies.add(SwampMoth(player.rect.x + 500, VISUAL_GROUND - 180))
+                            enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 210))
+                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 240))
+                            enemies.add(PoisonToad(player.rect.x + 250, VISUAL_GROUND))
+                            enemies.add(PoisonToad(player.rect.x - 1450, VISUAL_GROUND))
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True
