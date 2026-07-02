@@ -5,7 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
-from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad, RotShaman
+from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad, Hecate
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -286,7 +286,7 @@ def draw_shake_effect(screen, background, comet, shake_frames):
 
 #member 3 UI, HP
 def draw_ui(screen, player, score):
-    """绘制UI（HP条、弹药、飞行能量、分数） - 整合了 Member 3 的任务"""
+    """绘制UI(HP条、弹药、飞行能量、分数) - 整合了 Member 3 的任务"""
     try:
         # 使用基础英文字体，加粗使其更清晰
         font = pygame.font.SysFont("arial", 36, bold=True)
@@ -696,9 +696,9 @@ def main():
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True
-                            print("⚠️ 最终区域锁定! Boss 腐败萨满 降临！")
+                            print("⚠️ 最终区域锁定! Boss HECATE 降临！")
                             # 召唤最终 Boss！(传入你想要的 X 坐标，Y 坐标使用地平线)
-                            enemies.add(RotShaman(player.rect.x + 400, VISUAL_GROUND))
+                            enemies.add(Hecate(player.rect.x + 400, VISUAL_GROUND))
                         
                     # 状态 B：已锁屏，玩家在战斗。怪物全死光就解锁
                     else:

@@ -147,7 +147,7 @@ class Player(pygame.sprite.Sprite):
         self.hp = min(self.hp + amount, self.max_hp)
         healed = self.hp - old_hp
         if healed > 0:
-            print(f"💚 回复 {healed} HP！当前 HP: {self.hp}")
+            print(f"💚 回复 {healed} HP! 当前 HP: {self.hp}")
         return healed
 
     # member3 

@@ -801,7 +801,7 @@ class TrackingSpike(pygame.sprite.Sprite):
 # ==========================================
 
 class BossSpike(pygame.sprite.Sprite):
-    """Boss 技能 1：深粉红散弹毒刺 (已修复空气墙伤害)"""
+    """Boss 技能 1: 深粉红散弹毒刺 (已修复空气墙伤害)"""
     def __init__(self, x, y, angle_offset, target_x, target_y):
         super().__init__()
         self.size = 32
@@ -892,7 +892,7 @@ class TrackingSpike(pygame.sprite.Sprite):
             # --- 阶段 1：死死跟随，并开启 5 秒倒计时 ---
             self.track_timer += 1
             if self.track_timer >= 300: 
-                print("⚠️ 5秒追踪时间到！惩罚机制触发！大毒刺将直接锁定玩家！")
+                print("⚠️ 5秒追踪时间到! 惩罚机制触发！大毒刺将直接锁定玩家！")
                 self.shared_state['tracking'] = False 
                 self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
                 
@@ -959,9 +959,9 @@ class TrackingSpike(pygame.sprite.Sprite):
                     self.kill()
 
 # ----------------------------------------------------
-# 最终 Boss：腐败萨满 (Rot Shaman)
+# 最终 Boss：HECATE
 # ----------------------------------------------------
-class RotShaman(pygame.sprite.Sprite):
+class Hecate(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         
