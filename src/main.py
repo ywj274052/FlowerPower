@@ -5,7 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
-from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad
+from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad, RotShaman
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -696,9 +696,9 @@ def main():
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True
-                            print("⚠️ 最终区域锁定! Boss 降临！")
-                            enemies.add(PoisonToad(player.rect.x - 400, VISUAL_GROUND))
-                            enemies.add(PoisonToad(player.rect.x + 400, VISUAL_GROUND))
+                            print("⚠️ 最终区域锁定! Boss 腐败萨满 降临！")
+                            # 召唤最终 Boss！(传入你想要的 X 坐标，Y 坐标使用地平线)
+                            enemies.add(RotShaman(player.rect.x + 400, VISUAL_GROUND))
                         
                     # 状态 B：已锁屏，玩家在战斗。怪物全死光就解锁
                     else:

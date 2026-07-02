@@ -1,6 +1,7 @@
 import pygame
 import math
 import os
+import random
 
 class PoisonZone(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
@@ -635,5 +636,513 @@ class PoisonToad(pygame.sprite.Sprite):
                 player.take_damage(self.attack_damage)
                 print(f"🐸 绿皮地精跳跃重击！造成 {self.attack_damage} 点伤害！")
             self.has_dealt_damage = True
+
+        self.update_animation()
+
+import random
+
+# ==========================================
+# 最终 Boss 专属物件与特效
+# ==========================================
+
+class BossSpike(pygame.sprite.Sprite):
+    """Boss 技能 1：深粉红散弹毒刺"""
+    def __init__(self, x, y, angle_offset, target_x, target_y):
+        super().__init__()
+        self.image = pygame.Surface((16, 16), pygame.SRCALPHA).convert_alpha()
+        # 画一个深粉红色的小毒刺
+        pygame.draw.circle(self.image, (255, 20, 147), (8, 8), 6)
+        pygame.draw.circle(self.image, (255, 180, 200), (8, 8), 3) # 高亮核心
+        self.rect = self.image.get_rect(center=(x, y))
+        self.hp = 1 
+        
+        # 计算基础角度，并加上偏移量形成散弹
+        base_angle = math.atan2(target_y - y, target_x - x)
+        final_angle = base_angle + angle_offset
+        speed = 6 
+        self.exact_x = float(x)
+        self.exact_y = float(y)
+        self.vx = math.cos(final_angle) * speed
+        self.vy = math.sin(final_angle) * speed
+
+    def update(self, player):
+        self.exact_x += self.vx
+        self.exact_y += self.vy
+        self.rect.x = int(self.exact_x)
+        self.rect.y = int(self.exact_y)
+        
+        if player and self.rect.colliderect(player.rect):
+            player.take_damage(8) 
+            print("💢 玩家被 Boss 散弹毒刺击中！")
+            self.kill() 
+            
+        if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
+            self.kill()
+
+class TrackingSpike(pygame.sprite.Sprite):
+    """Boss 技能 3: 深粉红追踪巨型毒刺 (加入超时惩罚机制)"""
+    def __init__(self, position_type, shared_state, player):
+        super().__init__()
+        self.size = 70  
+        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
+        self.rect = self.image.get_rect()
+        
+        self.hp = 20 
+        
+        self.position_type = position_type
+        self.shared_state = shared_state
+        self.player = player
+        
+        self.exact_x = 0.0
+        self.exact_y = 0.0
+        self.vx = 0
+        self.vy = 0
+        self.fired = False
+        
+        self.lock_timer = 0
+        self.track_timer = 0 
+
+    def draw_crystal(self, angle_deg):
+        self.image.fill((0,0,0,0))
+        base_img = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        pygame.draw.polygon(base_img, (255, 20, 147, 80), [(0, 35), (70, 35), (35, 15), (35, 55)])
+        pygame.draw.polygon(base_img, (180, 0, 80), [(10, 35), (60, 35), (35, 22), (35, 48)])
+        pygame.draw.polygon(base_img, (255, 150, 200), [(20, 35), (50, 35), (35, 28), (35, 42)])
+        
+        self.image = pygame.transform.rotate(base_img, -angle_deg)
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+    def kill(self):
+        """记录解除原因：如果是被打爆的，标记为 'broken'"""
+        if self.shared_state.get('tracking', True):
+            print("💥 漂亮！玩家打碎了巨刺阵眼！追踪立即停止！")
+            self.shared_state['tracking'] = False
+            self.shared_state['reason'] = 'broken'  # 【新增】告诉其他毒刺：我是被打碎的！
+        super().kill()
+
+    def update(self, player_ignored):
+        hitbox = self.rect.inflate(-30, -30)
+        
+        if self.shared_state.get('tracking', True):
+            # --- 阶段 1：死死跟随，并开启 5 秒倒计时 ---
+            self.track_timer += 1
+            if self.track_timer >= 300: 
+                print("⚠️ 5秒追踪时间到！惩罚机制触发！大毒刺将直接锁定玩家！")
+                self.shared_state['tracking'] = False 
+                self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
+                
+            offset = 120
+            if self.position_type == 'top': target = (self.player.rect.centerx, self.player.rect.centery - offset)
+            elif self.position_type == 'bottom': target = (self.player.rect.centerx, self.player.rect.centery + offset)
+            elif self.position_type == 'left': target = (self.player.rect.centerx - offset, self.player.rect.centery)
+            elif self.position_type == 'right': target = (self.player.rect.centerx + offset, self.player.rect.centery)
+                
+            self.rect.center = target
+            self.exact_x, self.exact_y = self.rect.x, self.rect.y
+            
+            # 矛头对准玩家
+            angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
+            self.draw_crystal(math.degrees(angle))
+            
+            if hitbox.colliderect(self.player.rect):
+                self.player.take_damage(10)
+                self.kill()
+        else:
+            # --- 阶段 2：根据解除原因，决定后续行为 ---
+            self.lock_timer += 1
+            
+            # 情况 A：因为超时而解除 (惩罚机制：立刻朝玩家射击)
+            if self.shared_state.get('reason') == 'timeout':
+                if self.lock_timer == 1:
+                    # 瞬间锁定玩家当前位置并发射，不给喘息时间！
+                    angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
+                    speed = 18  # 弹道极快
+                    self.vx = math.cos(angle) * speed
+                    self.vy = math.sin(angle) * speed
+                    self.draw_crystal(math.degrees(angle))
+                    self.fired = True
+
+            # 情况 B：因为玩家打碎了其中一根而解除 (奖励机制：停顿2秒，十字乱射)
+            elif self.shared_state.get('reason') == 'broken':
+                if self.lock_timer == 1:
+                    if self.position_type == 'top': self.draw_crystal(-90)
+                    elif self.position_type == 'bottom': self.draw_crystal(90)
+                    elif self.position_type == 'left': self.draw_crystal(180)
+                    elif self.position_type == 'right': self.draw_crystal(0)
+                    
+                if self.lock_timer >= 120 and not self.fired:
+                    speed = 15
+                    if self.position_type == 'top': self.vx, self.vy = 0, -speed
+                    elif self.position_type == 'bottom': self.vx, self.vy = 0, speed
+                    elif self.position_type == 'left': self.vx, self.vy = -speed, 0
+                    elif self.position_type == 'right': self.vx, self.vy = speed, 0
+                    self.fired = True
+                
+            # 执行发射后的移动逻辑
+            if self.fired:
+                self.exact_x += self.vx
+                self.exact_y += self.vy
+                self.rect.x = int(self.exact_x)
+                self.rect.y = int(self.exact_y)
+                
+                if hitbox.colliderect(self.player.rect):
+                    self.player.take_damage(15)
+                    print("📌 玩家被 Boss 巨型毒刺命中！")
+                    self.kill()
+                    
+                if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
+                    self.kill()
+
+# ----------------------------------------------------
+# 最终 Boss：腐败萨满 (Rot Shaman)
+# ----------------------------------------------------
+# ==========================================
+# 最终 Boss 专属物件与特效
+# ==========================================
+
+class BossSpike(pygame.sprite.Sprite):
+    """Boss 技能 1：深粉红散弹毒刺 (已修复空气墙伤害)"""
+    def __init__(self, x, y, angle_offset, target_x, target_y):
+        super().__init__()
+        self.size = 32
+        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
+        self.rect = self.image.get_rect(center=(x, y))
+        self.hp = 1 
+        
+        base_angle = math.atan2(target_y - y, target_x - x)
+        final_angle = base_angle + angle_offset
+        speed = 8 
+        self.exact_x = float(x)
+        self.exact_y = float(y)
+        self.vx = math.cos(final_angle) * speed
+        self.vy = math.sin(final_angle) * speed
+        
+        angle_deg = math.degrees(final_angle)
+        base_img = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        pygame.draw.polygon(base_img, (255, 20, 147, 100), [(0, 16), (32, 16), (20, 8), (20, 24)]) 
+        pygame.draw.polygon(base_img, (200, 0, 100), [(4, 16), (28, 16), (20, 12), (20, 20)])      
+        pygame.draw.polygon(base_img, (255, 200, 220), [(12, 16), (24, 16), (20, 14), (20, 18)])   
+        
+        self.image = pygame.transform.rotate(base_img, -angle_deg)
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+    def update(self, player):
+        self.exact_x += self.vx
+        self.exact_y += self.vy
+        self.rect.x = int(self.exact_x)
+        self.rect.y = int(self.exact_y)
+        
+        # 【核心修复：缩小判定框】
+        # inflate(-16, -16) 意味着将物理判定框的宽高各缩小 16 像素。
+        # 这样毒刺的边缘光晕就不会造成伤害，必须是“实体刺中”才会扣血！
+        hitbox = self.rect.inflate(-16, -16)
+        
+        if player and hitbox.colliderect(player.rect):
+            player.take_damage(8) 
+            self.kill() 
+            
+        if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
+            self.kill()
+
+class TrackingSpike(pygame.sprite.Sprite):
+    """Boss 技能 3: 深粉红追踪巨型毒刺 (加入超时惩罚机制)"""
+    def __init__(self, position_type, shared_state, player):
+        super().__init__()
+        self.size = 70  
+        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
+        self.rect = self.image.get_rect()
+        
+        self.hp = 20 
+        
+        self.position_type = position_type
+        self.shared_state = shared_state
+        self.player = player
+        
+        self.exact_x = 0.0
+        self.exact_y = 0.0
+        self.vx = 0
+        self.vy = 0
+        self.fired = False
+        
+        self.lock_timer = 0
+        self.track_timer = 0 
+
+    def draw_crystal(self, angle_deg):
+        self.image.fill((0,0,0,0))
+        base_img = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        pygame.draw.polygon(base_img, (255, 20, 147, 80), [(0, 35), (70, 35), (35, 15), (35, 55)])
+        pygame.draw.polygon(base_img, (180, 0, 80), [(10, 35), (60, 35), (35, 22), (35, 48)])
+        pygame.draw.polygon(base_img, (255, 150, 200), [(20, 35), (50, 35), (35, 28), (35, 42)])
+        
+        self.image = pygame.transform.rotate(base_img, -angle_deg)
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+    def kill(self):
+        """记录解除原因：如果是被打爆的，标记为 'broken'"""
+        if self.shared_state.get('tracking', True):
+            print("💥 漂亮！玩家打碎了巨刺阵眼！追踪立即停止！")
+            self.shared_state['tracking'] = False
+            self.shared_state['reason'] = 'broken'  # 【新增】告诉其他毒刺：我是被打碎的！
+        super().kill()
+
+    def update(self, player_ignored):
+        hitbox = self.rect.inflate(-30, -30)
+        
+        if self.shared_state.get('tracking', True):
+            # --- 阶段 1：死死跟随，并开启 5 秒倒计时 ---
+            self.track_timer += 1
+            if self.track_timer >= 300: 
+                print("⚠️ 5秒追踪时间到！惩罚机制触发！大毒刺将直接锁定玩家！")
+                self.shared_state['tracking'] = False 
+                self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
+                
+            offset = 120
+            if self.position_type == 'top': target = (self.player.rect.centerx, self.player.rect.centery - offset)
+            elif self.position_type == 'bottom': target = (self.player.rect.centerx, self.player.rect.centery + offset)
+            elif self.position_type == 'left': target = (self.player.rect.centerx - offset, self.player.rect.centery)
+            elif self.position_type == 'right': target = (self.player.rect.centerx + offset, self.player.rect.centery)
+                
+            self.rect.center = target
+            self.exact_x, self.exact_y = self.rect.x, self.rect.y
+            
+            # 矛头对准玩家
+            angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
+            self.draw_crystal(math.degrees(angle))
+            
+            if hitbox.colliderect(self.player.rect):
+                self.player.take_damage(10)
+                self.kill()
+        else:
+            # --- 阶段 2：根据解除原因，决定后续行为 ---
+            self.lock_timer += 1
+            
+            # 情况 A：因为超时而解除 (惩罚机制：立刻朝玩家射击)
+            if self.shared_state.get('reason') == 'timeout':
+                if self.lock_timer == 1:
+                    # 瞬间锁定玩家当前位置并发射，不给喘息时间！
+                    angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
+                    speed = 18  # 弹道极快
+                    self.vx = math.cos(angle) * speed
+                    self.vy = math.sin(angle) * speed
+                    self.draw_crystal(math.degrees(angle))
+                    self.fired = True
+
+            # 情况 B：因为玩家打碎了其中一根而解除 (奖励机制：停顿2秒，十字乱射)
+            elif self.shared_state.get('reason') == 'broken':
+                if self.lock_timer == 1:
+                    if self.position_type == 'top': self.draw_crystal(-90)
+                    elif self.position_type == 'bottom': self.draw_crystal(90)
+                    elif self.position_type == 'left': self.draw_crystal(180)
+                    elif self.position_type == 'right': self.draw_crystal(0)
+                    
+                if self.lock_timer >= 120 and not self.fired:
+                    speed = 15
+                    if self.position_type == 'top': self.vx, self.vy = 0, -speed
+                    elif self.position_type == 'bottom': self.vx, self.vy = 0, speed
+                    elif self.position_type == 'left': self.vx, self.vy = -speed, 0
+                    elif self.position_type == 'right': self.vx, self.vy = speed, 0
+                    self.fired = True
+                
+            # 执行发射后的移动逻辑
+            if self.fired:
+                self.exact_x += self.vx
+                self.exact_y += self.vy
+                self.rect.x = int(self.exact_x)
+                self.rect.y = int(self.exact_y)
+                
+                if hitbox.colliderect(self.player.rect):
+                    self.player.take_damage(15)
+                    print("📌 玩家被 Boss 巨型毒刺命中！")
+                    self.kill()
+                    
+                if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
+                    self.kill()
+
+# ----------------------------------------------------
+# 最终 Boss：腐败萨满 (Rot Shaman)
+# ----------------------------------------------------
+class RotShaman(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        
+        if x > 1100: x = 1100
+        self.exact_x = float(x) 
+
+        self.state = 'idle'            
+        self.facing_right = False      
+        self.animations = {
+            'idle': [], 'walk': [], 'run': [], 
+            'attack1': [], 'attack2': [], 'attack3': [], 
+            'hurt': [], 'dead': []
+        }
+        self.frame_index = 0           
+        self.animation_speed = 0.2     
+        
+        self.load_animations(base_path="assets/sprites/enemies/Level3_Boss/")
+        
+        self.image = self.animations[self.state][self.frame_index]
+        self.y_offset = 20  
+        self.ground_y = y + self.y_offset
+        self.rect = self.image.get_rect(bottomleft=(x, self.ground_y))
+
+        self.hp = 150
+        self.last_hp = 150              
+        self.walk_speed = 1.5
+        self.run_speed = 7.0       
+        self.attack_cooldown = 120 
+        self.current_action_done = True
+        self.has_fired = False
+
+        self.is_hurt = False
+        self.is_dead = False
+
+    def kill(self):
+        if not getattr(self, 'is_dead', False):
+            self.hp = 0
+            self.is_dead = True
+            self.state = 'dead'
+            self.frame_index = 0
+            self.rect.width = 0
+            self.rect.height = 0
+            return 
+        if hasattr(self, 'dead_timer') and self.dead_timer >= 180: 
+            super().kill()
+
+    def load_animations(self, base_path):
+        animation_config = {
+            'idle':    {'file': 'Idle.png', 'frames': 5},
+            'walk':    {'file': 'Walk.png', 'frames': 5}, 
+            'run':     {'file': 'Run.png', 'frames': 5}, 
+            'attack1': {'file': 'Attack_4.png', 'frames': 7}, 
+            'attack2': {'file': 'Attack_2.png', 'frames': 4}, 
+            'attack3': {'file': 'Attack_3.png', 'frames': 7}, 
+            'hurt':    {'file': 'Hurt.png', 'frames': 3},
+            'dead':    {'file': 'Dead.png', 'frames': 4}
+        }
+        scale = 2.0 
+        for state, info in animation_config.items():
+            path = os.path.join(base_path, info['file'])
+            if os.path.exists(path):
+                sheet = pygame.image.load(path).convert_alpha()
+                fw = sheet.get_width() // info['frames']
+                fh = sheet.get_height()
+                for i in range(info['frames']):
+                    img = pygame.Surface((fw, fh), pygame.SRCALPHA).convert_alpha()
+                    img.blit(sheet, (0, 0), (i * fw, 0, fw, fh))
+                    img = pygame.transform.scale(img, (int(fw * scale), int(fh * scale)))
+                    self.animations[state].append(img)
+            else:
+                # 依然保留紫块报错机制，没找到图就会变成紫块！
+                fw, fh = 100, 100
+                for i in range(info['frames']):
+                    img = pygame.Surface((int(fw * scale), int(fh * scale)))
+                    img.fill((100, 0, 100)) 
+                    self.animations[state].append(img)
+
+    def update_animation(self):
+        if self.state == 'dead':
+            if self.frame_index < len(self.animations['dead']) - 1:
+                self.frame_index += self.animation_speed
+            else:
+                self.frame_index = len(self.animations['dead']) - 1 
+                if not hasattr(self, 'dead_timer'): self.dead_timer = 0
+                self.dead_timer += 1
+                if self.dead_timer >= 180: self.kill()
+            img = self.animations['dead'][int(self.frame_index)]
+            self.image = pygame.transform.flip(img, True, False) if not self.facing_right else img
+            return
+
+        self.frame_index += self.animation_speed
+        
+        if self.frame_index >= len(self.animations[self.state]):
+            if self.is_hurt:
+                self.is_hurt = False
+            
+            if self.state in ['attack1', 'attack2', 'attack3', 'run']:
+                self.current_action_done = True
+                self.attack_cooldown = 90  # 技能后摇缩短，加快战斗节奏
+            
+            self.state = 'idle'
+            self.frame_index = 0 
+
+        img = self.animations[self.state][int(self.frame_index)]
+        self.image = pygame.transform.flip(img, True, False) if not self.facing_right else img
+
+    def update(self, player):
+        if self.is_dead:
+            self.update_animation()
+            return
+
+        if self.hp < self.last_hp:
+            if self.hp <= 0:
+                self.is_dead = True
+                self.state = 'dead'
+                self.frame_index = 0
+            elif self.state in ['idle', 'walk']:
+                self.is_hurt = True
+                self.state = 'hurt'
+                self.frame_index = 0
+            self.last_hp = self.hp
+
+        if not self.is_hurt:
+            if player:
+                distance = abs(self.rect.centerx - player.rect.centerx)
+                if self.state not in ['attack1', 'attack2', 'attack3', 'run']:
+                    self.facing_right = True if self.rect.centerx < player.rect.centerx else False
+                
+                # --- 【AI 重构】：概率调整 ---
+                if self.current_action_done and self.attack_cooldown <= 0:
+                    self.current_action_done = False
+                    self.has_fired = False
+                    self.frame_index = 0
+                    
+                    rand_val = random.random()
+                    # 只有 20% 的几率触发大招！
+                    if rand_val < 0.20:
+                        print("💀 Boss 释放大招：追踪巨型毒刺！")
+                        self.state = 'attack3'
+                    # 40% 的几率触发散弹
+                    elif rand_val < 0.60:
+                        print("💀 Boss 释放技能 1: 深粉红散弹！")
+                        self.state = 'attack1'
+                    # 40% 的几率触发冲锋近战
+                    else:
+                        print("💀 Boss 释放技能 2: 致命冲锋！")
+                        self.state = 'run'
+                        
+                elif self.current_action_done:
+                    self.attack_cooldown -= 1
+                    self.state = 'walk'
+                    self.exact_x += self.walk_speed if self.facing_right else -self.walk_speed
+                    self.rect.x = int(self.exact_x)
+
+                if self.state == 'attack1' and int(self.frame_index) == 4 and not self.has_fired:
+                    angles = [-0.3, 0, 0.3] 
+                    for angle in angles:
+                        spike = BossSpike(self.rect.centerx, self.rect.centery, angle, player.rect.centerx, player.rect.centery)
+                        for group in self.groups(): group.add(spike)
+                    self.has_fired = True
+                    
+                if self.state == 'run':
+                    self.exact_x += self.run_speed if self.facing_right else -self.run_speed
+                    self.rect.x = int(self.exact_x)
+                    if distance <= 120:
+                        self.state = 'attack2'
+                        self.frame_index = 0
+                        self.has_fired = False
+                        
+                if self.state == 'attack2' and int(self.frame_index) == 2 and not self.has_fired:
+                    if self.rect.colliderect(player.rect):
+                        player.take_damage(15)
+                        print("🩸 玩家受到 Boss 致命近战斩击！")
+                    self.has_fired = True
+                    
+                if self.state == 'attack3' and int(self.frame_index) == 5 and not self.has_fired:
+                    shared_state = {'tracking': True}
+                    positions = ['top', 'bottom', 'left', 'right']
+                    for pos in positions:
+                        spike = TrackingSpike(pos, shared_state, player)
+                        for group in self.groups(): group.add(spike)
+                    self.has_fired = True
 
         self.update_animation()
