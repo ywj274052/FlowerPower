@@ -3,38 +3,116 @@ import math
 import os
 import random
 
-class PoisonZone(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height):
-        super().__init__()
-        # 创建一个支持透明度的表面，设为紫色半透明以符合毒液的视觉效果
-        self.image = pygame.Surface((width, height), pygame.SRCALPHA)
-        self.image.fill((128, 0, 128, 120)) 
-        self.rect = self.image.get_rect(topleft=(x, y))
+# ==========================================
+# 关卡机制：全屏毒气生存系统 
+# ==========================================
+class PoisonGasSystem:
+    def __init__(self, screen_width=1280, screen_height=720):
+        self.width = screen_width
+        self.height = screen_height
         
-        # 伤害计时器
-        self.damage_timer = 0
+        self.active = False              
+        self.gas_released = False        
+        self.wave_timer = 0              
+        self.gas_duration_timer = 0      
+        self.damage_tick_timer = 0       
+        self.damage_accumulated = 0      
+        
+        # --- 视觉特效升级 1：预渲染静态边缘晕影 (Vignette) ---
+        # 屏幕中间完全透明，只有边缘有渐变的暗绿色
+        self.vignette = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(40):
+            # 透明度从边缘向内递减
+            alpha = 120 - i * 3
+            if alpha < 0: alpha = 0
+            rect = pygame.Rect(i * 4, i * 4, self.width - i * 8, self.height - i * 8)
+            pygame.draw.rect(self.vignette, (40, 120, 40, alpha), rect, 4)
+
+        # --- 视觉特效升级 2：毒孢子粒子系统 ---
+        self.particles = []
+        for _ in range(50): # 满屏分布 50 个小毒孢子
+            self.particles.append({
+                'x': random.randint(0, self.width),
+                'y': random.randint(0, self.height),
+                'speed': random.uniform(0.5, 2.0),
+                'size': random.randint(2, 4)
+            })
+
+    def start_wave(self):
+        self.active = True
+        self.gas_released = False
+        self.wave_timer = 0
+        self.damage_accumulated = 0
+
+    def end_wave(self, player):
+        if self.active:
+            if self.damage_accumulated > 0:
+                player.hp += self.damage_accumulated
+                if hasattr(player, 'max_hp') and player.hp > player.max_hp:
+                    player.hp = player.max_hp
+                print(f"✨ 毒气消散！系统为您返还了 {self.damage_accumulated} 点生命值！")
+            
+            self.active = False
+            self.gas_released = False
+            self.damage_accumulated = 0
 
     def update(self, player):
-        # 检测玩家的碰撞框是否和毒沼泽重叠
-        if self.rect.colliderect(player.rect):
-            self.damage_timer += 1
-            # 假设游戏是 60 FPS，30 帧就是半秒
-            if self.damage_timer >= 30: 
-                player.hp -= 2
-                self.damage_timer = 0
+        if not self.active:
+            return
+
+        # 阶段 1：倒数 10 秒 (60帧 * 10 = 600)
+        if not self.gas_released:
+            self.wave_timer += 1
+            if self.wave_timer == 600:
+                self.gas_released = True
+                self.gas_duration_timer = 0
+                self.damage_tick_timer = 0
+                print("☣️ 警告！全屏毒气开始释放，持续 10 秒！")
+                
+        # 阶段 2：毒气喷发期间 (持续 10 秒)
         else:
-            # 玩家离开毒沼泽，立刻重置计时器
-            self.damage_timer = 0
+            self.gas_duration_timer += 1
+            if self.gas_duration_timer <= 600:
+                # --- 更新粒子物理运动 ---
+                for p in self.particles:
+                    p['y'] -= p['speed'] # 向上飘
+                    p['x'] += math.sin(p['y'] * 0.05) * 1.5 # 左右摇摆
+                    # 飞出屏幕顶部后，从底部重新生成
+                    if p['y'] < -10:
+                        p['y'] = self.height + 10
+                        p['x'] = random.randint(0, self.width)
+                        
+                # --- 扣血逻辑 ---
+                self.damage_tick_timer += 1
+                if self.damage_tick_timer >= 60: 
+                    self.damage_tick_timer = 0
+                    damage = 3
+                    player.hp -= damage   
+                    self.damage_accumulated += damage
+                    print(f"🤢 吸入毒气！失去 3 点生命... (已累计失去 {self.damage_accumulated} 点)")
+                    
+                    player.is_hurt = True
+                    if hasattr(player, 'hurt_timer'): player.hurt_timer = 30
+            else:
+                pass 
 
     def draw(self, screen):
-        screen.blit(self.image, self.rect)
+        """渲染护眼版毒气特效"""
+        if self.gas_released and self.gas_duration_timer <= 600:
+            # 1. 绘制静态边缘绿光 (绝不闪烁，中间清晰)
+            screen.blit(self.vignette, (0, 0))
+            
+            # 2. 绘制漂浮的毒孢子
+            for p in self.particles:
+                # 画一个带点透明度的绿色小圆点
+                pygame.draw.circle(screen, (100, 255, 100, 180), (int(p['x']), int(p['y'])), p['size'])
 
 # ==========================================
 # Level 3 专属怪物系统
 # ==========================================
 
 class ToxicSludge(pygame.sprite.Sprite):
-    """怪物 1：兽人步兵 (分离式 PNG 动画加载)"""
+    """怪物 1: 兽人步兵 (分离式 PNG 动画加载)"""
     def __init__(self, x, y):
         super().__init__()
         
@@ -63,6 +141,9 @@ class ToxicSludge(pygame.sprite.Sprite):
         self.is_attacking = False
         self.attack_cooldown = 0
         self.has_dealt_damage = False  
+
+        self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
+        self.show_hp_timer = 0    # 显血计时器
 
     def kill(self):
         """【核心黑科技：拦截 main.py 的瞬间删除指令】"""
@@ -171,6 +252,7 @@ class ToxicSludge(pygame.sprite.Sprite):
     def update(self, player):
         # 1. 受击判定
         if self.hp < self.last_hp and not self.is_dead:
+            self.show_hp_timer = 300  # 【新增】受到伤害，重置为 300 帧 (5秒)
             if self.hp <= 0:
                 self.is_dead = True
                 self.state = 'dead'
@@ -223,6 +305,28 @@ class ToxicSludge(pygame.sprite.Sprite):
                 player.take_damage(self.attack_damage)
                 print(f"🪓 兽人重砍！造成 {self.attack_damage} 点伤害！")
             self.has_dealt_damage = True
+
+    def draw_health_bar(self, screen):
+        """绘制头顶动态血条 (受击后显示 5 秒)"""
+        # 如果还没死，并且计时器大于 0，才绘制
+        if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
+            self.show_hp_timer -= 1  # 倒计时流逝
+            
+            bar_width = 40
+            bar_height = 6
+            # 算出头顶的正中位置 (往上偏移 15 像素)
+            x = self.rect.centerx - bar_width // 2
+            y = self.rect.top - 15
+            
+            # 计算当前血量百分比 (加 max 防止变负数)
+            health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
+            
+            # 画黑灰色底框
+            pygame.draw.rect(screen, (40, 40, 40), (x, y, bar_width, bar_height))
+            # 画红色的当前血量
+            pygame.draw.rect(screen, (220, 20, 60), (x, y, int(bar_width * health_ratio), bar_height))
+            # 画白色的外边框
+            pygame.draw.rect(screen, (255, 255, 255), (x, y, bar_width, bar_height), 1)
 
         self.update_animation()
 
@@ -308,6 +412,9 @@ class SwampMoth(pygame.sprite.Sprite):
         self.is_dead = False
         self.shoot_timer = 0
         self.has_shot = False  # 确保一次施法只发射一颗子弹
+
+        self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
+        self.show_hp_timer = 0    # 显血计时器
 
     def kill(self):
         """【拦截 main.py 的瞬间删除指令】"""
@@ -398,6 +505,12 @@ class SwampMoth(pygame.sprite.Sprite):
         if self.is_dead:
             self.update_animation()
             return
+        
+        # 【新增】法师的扣血检测与计时器激活
+        if not hasattr(self, 'last_hp'): self.last_hp = self.hp
+        if self.hp < self.last_hp:
+            self.show_hp_timer = 300  # 受到伤害，重置为 300 帧 (5秒)
+            self.last_hp = self.hp
             
         # 2. 扣血转死亡
         if self.hp <= 0:
@@ -431,6 +544,28 @@ class SwampMoth(pygame.sprite.Sprite):
                 for group in self.groups():
                     group.add(spike)
                 self.has_shot = True
+
+    def draw_health_bar(self, screen):
+        """绘制头顶动态血条 (受击后显示 5 秒)"""
+        # 如果还没死，并且计时器大于 0，才绘制
+        if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
+            self.show_hp_timer -= 1  # 倒计时流逝
+            
+            bar_width = 40
+            bar_height = 6
+            # 算出头顶的正中位置 (往上偏移 15 像素)
+            x = self.rect.centerx - bar_width // 2
+            y = self.rect.top - 15
+            
+            # 计算当前血量百分比 (加 max 防止变负数)
+            health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
+            
+            # 画黑灰色底框
+            pygame.draw.rect(screen, (40, 40, 40), (x, y, bar_width, bar_height))
+            # 画红色的当前血量
+            pygame.draw.rect(screen, (220, 20, 60), (x, y, int(bar_width * health_ratio), bar_height))
+            # 画白色的外边框
+            pygame.draw.rect(screen, (255, 255, 255), (x, y, bar_width, bar_height), 1)
 
         self.update_animation()
 
@@ -472,6 +607,9 @@ class PoisonToad(pygame.sprite.Sprite):
         self.is_dead = False
         self.attack_cooldown = 0
         self.has_dealt_damage = False  
+
+        self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
+        self.show_hp_timer = 0    # 显血计时器
 
     def kill(self):
         if not getattr(self, 'is_dead', False):
@@ -556,6 +694,7 @@ class PoisonToad(pygame.sprite.Sprite):
             return
 
         if self.hp < self.last_hp and not self.is_dead:
+            self.show_hp_timer = 300  # 【新增】受到伤害，重置为 300 帧 (5秒)
             if self.hp <= 0:
                 self.is_dead = True
                 self.state = 'dead'
@@ -637,165 +776,30 @@ class PoisonToad(pygame.sprite.Sprite):
                 print(f"🐸 绿皮地精跳跃重击！造成 {self.attack_damage} 点伤害！")
             self.has_dealt_damage = True
 
+    def draw_health_bar(self, screen):
+        """绘制头顶动态血条 (受击后显示 5 秒)"""
+        # 如果还没死，并且计时器大于 0，才绘制
+        if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
+            self.show_hp_timer -= 1  # 倒计时流逝
+            
+            bar_width = 40
+            bar_height = 6
+            # 算出头顶的正中位置 (往上偏移 15 像素)
+            x = self.rect.centerx - bar_width // 2
+            y = self.rect.top - 15
+            
+            # 计算当前血量百分比 (加 max 防止变负数)
+            health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
+            
+            # 画黑灰色底框
+            pygame.draw.rect(screen, (40, 40, 40), (x, y, bar_width, bar_height))
+            # 画红色的当前血量
+            pygame.draw.rect(screen, (220, 20, 60), (x, y, int(bar_width * health_ratio), bar_height))
+            # 画白色的外边框
+            pygame.draw.rect(screen, (255, 255, 255), (x, y, bar_width, bar_height), 1)
+
         self.update_animation()
 
-import random
-
-# ==========================================
-# 最终 Boss 专属物件与特效
-# ==========================================
-
-class BossSpike(pygame.sprite.Sprite):
-    """Boss 技能 1：深粉红散弹毒刺"""
-    def __init__(self, x, y, angle_offset, target_x, target_y):
-        super().__init__()
-        self.image = pygame.Surface((16, 16), pygame.SRCALPHA).convert_alpha()
-        # 画一个深粉红色的小毒刺
-        pygame.draw.circle(self.image, (255, 20, 147), (8, 8), 6)
-        pygame.draw.circle(self.image, (255, 180, 200), (8, 8), 3) # 高亮核心
-        self.rect = self.image.get_rect(center=(x, y))
-        self.hp = 1 
-        
-        # 计算基础角度，并加上偏移量形成散弹
-        base_angle = math.atan2(target_y - y, target_x - x)
-        final_angle = base_angle + angle_offset
-        speed = 6 
-        self.exact_x = float(x)
-        self.exact_y = float(y)
-        self.vx = math.cos(final_angle) * speed
-        self.vy = math.sin(final_angle) * speed
-
-    def update(self, player):
-        self.exact_x += self.vx
-        self.exact_y += self.vy
-        self.rect.x = int(self.exact_x)
-        self.rect.y = int(self.exact_y)
-        
-        if player and self.rect.colliderect(player.rect):
-            player.take_damage(8) 
-            print("💢 玩家被 Boss 散弹毒刺击中！")
-            self.kill() 
-            
-        if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
-            self.kill()
-
-class TrackingSpike(pygame.sprite.Sprite):
-    """Boss 技能 3: 深粉红追踪巨型毒刺 (加入超时惩罚机制)"""
-    def __init__(self, position_type, shared_state, player):
-        super().__init__()
-        self.size = 70  
-        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
-        self.rect = self.image.get_rect()
-        
-        self.hp = 20 
-        
-        self.position_type = position_type
-        self.shared_state = shared_state
-        self.player = player
-        
-        self.exact_x = 0.0
-        self.exact_y = 0.0
-        self.vx = 0
-        self.vy = 0
-        self.fired = False
-        
-        self.lock_timer = 0
-        self.track_timer = 0 
-
-    def draw_crystal(self, angle_deg):
-        self.image.fill((0,0,0,0))
-        base_img = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-        pygame.draw.polygon(base_img, (255, 20, 147, 80), [(0, 35), (70, 35), (35, 15), (35, 55)])
-        pygame.draw.polygon(base_img, (180, 0, 80), [(10, 35), (60, 35), (35, 22), (35, 48)])
-        pygame.draw.polygon(base_img, (255, 150, 200), [(20, 35), (50, 35), (35, 28), (35, 42)])
-        
-        self.image = pygame.transform.rotate(base_img, -angle_deg)
-        self.rect = self.image.get_rect(center=self.rect.center)
-
-    def kill(self):
-        """记录解除原因：如果是被打爆的，标记为 'broken'"""
-        if self.shared_state.get('tracking', True):
-            print("💥 漂亮！玩家打碎了巨刺阵眼！追踪立即停止！")
-            self.shared_state['tracking'] = False
-            self.shared_state['reason'] = 'broken'  # 【新增】告诉其他毒刺：我是被打碎的！
-        super().kill()
-
-    def update(self, player_ignored):
-        hitbox = self.rect.inflate(-30, -30)
-        
-        if self.shared_state.get('tracking', True):
-            # --- 阶段 1：死死跟随，并开启 5 秒倒计时 ---
-            self.track_timer += 1
-            if self.track_timer >= 300: 
-                print("⚠️ 5秒追踪时间到！惩罚机制触发！大毒刺将直接锁定玩家！")
-                self.shared_state['tracking'] = False 
-                self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
-                
-            offset = 120
-            if self.position_type == 'top': target = (self.player.rect.centerx, self.player.rect.centery - offset)
-            elif self.position_type == 'bottom': target = (self.player.rect.centerx, self.player.rect.centery + offset)
-            elif self.position_type == 'left': target = (self.player.rect.centerx - offset, self.player.rect.centery)
-            elif self.position_type == 'right': target = (self.player.rect.centerx + offset, self.player.rect.centery)
-                
-            self.rect.center = target
-            self.exact_x, self.exact_y = self.rect.x, self.rect.y
-            
-            # 矛头对准玩家
-            angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
-            self.draw_crystal(math.degrees(angle))
-            
-            if hitbox.colliderect(self.player.rect):
-                self.player.take_damage(10)
-                self.kill()
-        else:
-            # --- 阶段 2：根据解除原因，决定后续行为 ---
-            self.lock_timer += 1
-            
-            # 情况 A：因为超时而解除 (惩罚机制：立刻朝玩家射击)
-            if self.shared_state.get('reason') == 'timeout':
-                if self.lock_timer == 1:
-                    # 瞬间锁定玩家当前位置并发射，不给喘息时间！
-                    angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
-                    speed = 18  # 弹道极快
-                    self.vx = math.cos(angle) * speed
-                    self.vy = math.sin(angle) * speed
-                    self.draw_crystal(math.degrees(angle))
-                    self.fired = True
-
-            # 情况 B：因为玩家打碎了其中一根而解除 (奖励机制：停顿2秒，十字乱射)
-            elif self.shared_state.get('reason') == 'broken':
-                if self.lock_timer == 1:
-                    if self.position_type == 'top': self.draw_crystal(-90)
-                    elif self.position_type == 'bottom': self.draw_crystal(90)
-                    elif self.position_type == 'left': self.draw_crystal(180)
-                    elif self.position_type == 'right': self.draw_crystal(0)
-                    
-                if self.lock_timer >= 120 and not self.fired:
-                    speed = 15
-                    if self.position_type == 'top': self.vx, self.vy = 0, -speed
-                    elif self.position_type == 'bottom': self.vx, self.vy = 0, speed
-                    elif self.position_type == 'left': self.vx, self.vy = -speed, 0
-                    elif self.position_type == 'right': self.vx, self.vy = speed, 0
-                    self.fired = True
-                
-            # 执行发射后的移动逻辑
-            if self.fired:
-                self.exact_x += self.vx
-                self.exact_y += self.vy
-                self.rect.x = int(self.exact_x)
-                self.rect.y = int(self.exact_y)
-                
-                if hitbox.colliderect(self.player.rect):
-                    self.player.take_damage(15)
-                    print("📌 玩家被 Boss 巨型毒刺命中！")
-                    self.kill()
-                    
-                if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
-                    self.kill()
-
-# ----------------------------------------------------
-# 最终 Boss：腐败萨满 (Rot Shaman)
-# ----------------------------------------------------
 # ==========================================
 # 最终 Boss 专属物件与特效
 # ==========================================
@@ -889,10 +893,10 @@ class TrackingSpike(pygame.sprite.Sprite):
         hitbox = self.rect.inflate(-30, -30)
         
         if self.shared_state.get('tracking', True):
-            # --- 阶段 1：死死跟随，并开启 5 秒倒计时 ---
+            # --- 阶段 1：死死跟随，并开启 2 秒倒计时 ---
             self.track_timer += 1
-            if self.track_timer >= 300: 
-                print("⚠️ 5秒追踪时间到! 惩罚机制触发！大毒刺将直接锁定玩家！")
+            if self.track_timer >= 120: 
+                print("⚠️ 2秒追踪时间到! 惩罚机制触发！大毒刺将直接锁定玩家！")
                 self.shared_state['tracking'] = False 
                 self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
                 
@@ -973,6 +977,7 @@ class Hecate(pygame.sprite.Sprite):
         self.animations = {
             'idle': [], 'walk': [], 'run': [], 
             'attack1': [], 'attack2': [], 'attack3': [], 
+            'scream': [], # 【新增】尖叫状态
             'hurt': [], 'dead': []
         }
         self.frame_index = 0           
@@ -986,13 +991,20 @@ class Hecate(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(bottomleft=(x, self.ground_y))
 
         self.hp = 150
-        self.last_hp = 150              
+        self.last_hp = 150 
+        self.max_hp = 150             
         self.walk_speed = 1.5
         self.run_speed = 7.0       
-        self.attack_cooldown = 120 
+        
+        self.attack_cooldown = 120    
+        self.ult_cooldown = 0         
+        
+        # 【新增】半血状态记录与自带毒气系统
+        self.has_screamed = False
+        self.boss_gas = BossPoisonGasSystem(1280, 720) 
+        
         self.current_action_done = True
         self.has_fired = False
-
         self.is_hurt = False
         self.is_dead = False
 
@@ -1016,10 +1028,11 @@ class Hecate(pygame.sprite.Sprite):
             'attack1': {'file': 'Attack_4.png', 'frames': 7}, 
             'attack2': {'file': 'Attack_2.png', 'frames': 4}, 
             'attack3': {'file': 'Attack_3.png', 'frames': 7}, 
+            'scream':  {'file': 'Scream.png', 'frames': 4}, # 【新增】加载 4 帧的尖叫动画
             'hurt':    {'file': 'Hurt.png', 'frames': 3},
             'dead':    {'file': 'Dead.png', 'frames': 4}
         }
-        scale = 2.0 
+        scale = 1.8 
         for state, info in animation_config.items():
             path = os.path.join(base_path, info['file'])
             if os.path.exists(path):
@@ -1032,7 +1045,6 @@ class Hecate(pygame.sprite.Sprite):
                     img = pygame.transform.scale(img, (int(fw * scale), int(fh * scale)))
                     self.animations[state].append(img)
             else:
-                # 依然保留紫块报错机制，没找到图就会变成紫块！
                 fw, fh = 100, 100
                 for i in range(info['frames']):
                     img = pygame.Surface((int(fw * scale), int(fh * scale)))
@@ -1058,9 +1070,10 @@ class Hecate(pygame.sprite.Sprite):
             if self.is_hurt:
                 self.is_hurt = False
             
-            if self.state in ['attack1', 'attack2', 'attack3', 'run']:
+            # 【包含 scream】技能或尖叫结束后，恢复待机
+            if self.state in ['attack1', 'attack2', 'attack3', 'run', 'scream']:
                 self.current_action_done = True
-                self.attack_cooldown = 90  # 技能后摇缩短，加快战斗节奏
+                self.attack_cooldown = 90  
             
             self.state = 'idle'
             self.frame_index = 0 
@@ -1073,11 +1086,27 @@ class Hecate(pygame.sprite.Sprite):
             self.update_animation()
             return
 
+        # 让毒气系统保持运转
+        self.boss_gas.update(player)
+
+        if self.ult_cooldown > 0:
+            self.ult_cooldown -= 1
+
+        # 【半血转阶段机制】如果血量首次 <= 50%，强制打断当前所有动作进入尖叫状态！
+        if self.hp <= self.max_hp * 0.5 and not self.has_screamed and not self.is_dead:
+            self.has_screamed = True
+            self.state = 'scream'
+            self.frame_index = 0
+            self.current_action_done = False
+            self.has_fired = False
+            self.is_hurt = False  # 清除受击僵直，展现霸体
+
         if self.hp < self.last_hp:
             if self.hp <= 0:
                 self.is_dead = True
                 self.state = 'dead'
                 self.frame_index = 0
+            # 只有在非大招、非尖叫阶段，才会产生受击硬直
             elif self.state in ['idle', 'walk']:
                 self.is_hurt = True
                 self.state = 'hurt'
@@ -1087,62 +1116,234 @@ class Hecate(pygame.sprite.Sprite):
         if not self.is_hurt:
             if player:
                 distance = abs(self.rect.centerx - player.rect.centerx)
-                if self.state not in ['attack1', 'attack2', 'attack3', 'run']:
+                if self.state not in ['attack1', 'attack2', 'attack3', 'run', 'scream']:
                     self.facing_right = True if self.rect.centerx < player.rect.centerx else False
                 
-                # --- 【AI 重构】：概率调整 ---
-                if self.current_action_done and self.attack_cooldown <= 0:
-                    self.current_action_done = False
-                    self.has_fired = False
-                    self.frame_index = 0
-                    
-                    rand_val = random.random()
-                    # 只有 20% 的几率触发大招！
-                    if rand_val < 0.20:
-                        print("💀 Boss 释放大招：追踪巨型毒刺！")
-                        self.state = 'attack3'
-                    # 40% 的几率触发散弹
-                    elif rand_val < 0.60:
-                        print("💀 Boss 释放技能 1: 深粉红散弹！")
-                        self.state = 'attack1'
-                    # 40% 的几率触发冲锋近战
-                    else:
-                        print("💀 Boss 释放技能 2: 致命冲锋！")
-                        self.state = 'run'
-                        
-                elif self.current_action_done:
-                    self.attack_cooldown -= 1
-                    self.state = 'walk'
-                    self.exact_x += self.walk_speed if self.facing_right else -self.walk_speed
-                    self.rect.x = int(self.exact_x)
+                # --- 【半血技能：尖叫毒气爆发】 ---
+                if self.state == 'scream':
+                    # 当尖叫动画播放到第 2 帧 (也就是开始张嘴的那一刻) 释放毒气
+                    if int(self.frame_index) == 2 and not self.has_fired:
+                        self.boss_gas.trigger()
+                        self.has_fired = True
 
-                if self.state == 'attack1' and int(self.frame_index) == 4 and not self.has_fired:
-                    angles = [-0.3, 0, 0.3] 
-                    for angle in angles:
-                        spike = BossSpike(self.rect.centerx, self.rect.centery, angle, player.rect.centerx, player.rect.centery)
-                        for group in self.groups(): group.add(spike)
-                    self.has_fired = True
-                    
-                if self.state == 'run':
-                    self.exact_x += self.run_speed if self.facing_right else -self.run_speed
-                    self.rect.x = int(self.exact_x)
-                    if distance <= 120:
-                        self.state = 'attack2'
-                        self.frame_index = 0
+                # --- 正常 AI 决策 (非尖叫状态下) ---
+                else:
+                    if self.current_action_done and self.attack_cooldown <= 0:
+                        self.current_action_done = False
                         self.has_fired = False
+                        self.frame_index = 0
                         
-                if self.state == 'attack2' and int(self.frame_index) == 2 and not self.has_fired:
-                    if self.rect.colliderect(player.rect):
-                        player.take_damage(15)
-                        print("🩸 玩家受到 Boss 致命近战斩击！")
-                    self.has_fired = True
-                    
-                if self.state == 'attack3' and int(self.frame_index) == 5 and not self.has_fired:
-                    shared_state = {'tracking': True}
-                    positions = ['top', 'bottom', 'left', 'right']
-                    for pos in positions:
-                        spike = TrackingSpike(pos, shared_state, player)
-                        for group in self.groups(): group.add(spike)
-                    self.has_fired = True
+                        if self.ult_cooldown <= 0 and random.random() < 0.20:
+                            print("💀 Boss 释放大招：追踪巨型毒刺！")
+                            self.state = 'attack3'
+                            self.ult_cooldown = 600  
+                        else:
+                            if random.random() < 0.50:
+                                print("💀 Boss 释放技能 1: 深粉红散弹！")
+                                self.state = 'attack1'
+                            else:
+                                print("💀 Boss 释放技能 2: 致命冲锋！")
+                                self.state = 'run'
+                            
+                    elif self.current_action_done:
+                        self.attack_cooldown -= 1
+                        self.state = 'walk'
+                        self.exact_x += self.walk_speed if self.facing_right else -self.walk_speed
+                        self.rect.x = int(self.exact_x)
+
+                    # --- 普通技能执行 ---
+                    if self.state == 'attack1' and int(self.frame_index) == 4 and not self.has_fired:
+                        angles = [-0.3, 0, 0.3] 
+                        for angle in angles:
+                            spike = BossSpike(self.rect.centerx, self.rect.centery, angle, player.rect.centerx, player.rect.centery)
+                            for group in self.groups(): group.add(spike)
+                        self.has_fired = True
+                        
+                    if self.state == 'run':
+                        self.exact_x += self.run_speed if self.facing_right else -self.run_speed
+                        self.rect.x = int(self.exact_x)
+                        if distance <= 120:
+                            self.state = 'attack2'
+                            self.frame_index = 0
+                            self.has_fired = False
+                            
+                    if self.state == 'attack2' and int(self.frame_index) == 2 and not self.has_fired:
+                        if self.rect.colliderect(player.rect):
+                            player.take_damage(15)
+                        self.has_fired = True
+                        
+                    if self.state == 'attack3' and int(self.frame_index) == 5 and not self.has_fired:
+                        shared_state = {'tracking': True}
+                        positions = ['top', 'bottom', 'left', 'right']
+                        for pos in positions:
+                            spike = TrackingSpike(pos, shared_state, player)
+                            for group in self.groups(): group.add(spike)
+                        self.has_fired = True
 
         self.update_animation()
+
+# ==========================================
+# Boss 战专属 UI 与 警告特效
+# ==========================================
+
+class BossWarningEffect:
+    """锁屏时的屏幕两侧红色渐变警告特效 (呼吸灯闪烁)"""
+    def __init__(self, screen_width=1280, screen_height=720):
+        self.width = screen_width
+        self.height = screen_height
+        self.active = False
+        self.timer = 0
+        
+        # 预先绘制带有透明通道的红色渐变条纹画布
+        self.surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        stripe_width = 150  # 渐变条纹的宽度
+        
+        for x in range(stripe_width):
+            # 越靠近边缘越红，越往屏幕中间越透明
+            alpha = int(255 * (1 - (x / stripe_width)))
+            # 左侧红边
+            pygame.draw.line(self.surface, (200, 0, 0, alpha), (x, 0), (x, self.height))
+            # 右侧红边
+            pygame.draw.line(self.surface, (200, 0, 0, alpha), (self.width - 1 - x, 0), (self.width - 1 - x, self.height))
+
+    def trigger(self):
+        """触发警告特效，持续 3 秒 (180帧)"""
+        self.active = True
+        self.timer = 180
+        print("🚨 Boss 警告特效已触发！")
+
+    def draw(self, screen):
+        """每帧调用，渲染呼吸闪烁效果"""
+        if self.active and self.timer > 0:
+            self.timer -= 1
+            # 使用正弦波函数计算呼吸闪烁的透明度 (忽明忽暗)
+            pulse_alpha = int(abs(math.sin(self.timer * 0.1)) * 150 + 50)
+            
+            # 复制一份画布来应用透明度，防止修改原画
+            temp_surface = self.surface.copy()
+            temp_surface.set_alpha(pulse_alpha)
+            screen.blit(temp_surface, (0, 0))
+        else:
+            self.active = False
+
+# ==========================================
+# Boss 半血大招：全屏深粉色毒气系统 (带锁血保护)
+# ==========================================
+class BossPoisonGasSystem:
+    def __init__(self, screen_width=1280, screen_height=720):
+        self.width = screen_width
+        self.height = screen_height
+        self.active = False
+        self.timer = 0
+        self.damage_tick = 0
+        
+        # 深粉色边缘晕影 (Vignette)
+        self.vignette = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(40):
+            alpha = 120 - i * 3
+            if alpha < 0: alpha = 0
+            rect = pygame.Rect(i * 4, i * 4, self.width - i * 8, self.height - i * 8)
+            # 深粉红色滤镜 (180, 20, 100)
+            pygame.draw.rect(self.vignette, (180, 20, 100, alpha), rect, 4)
+
+        # 深粉色毒孢子
+        self.particles = []
+        for _ in range(50): 
+            self.particles.append({
+                'x': random.randint(0, self.width),
+                'y': random.randint(0, self.height),
+                'speed': random.uniform(0.5, 2.0),
+                'size': random.randint(2, 4)
+            })
+
+    def trigger(self):
+        self.active = True
+        self.timer = 600  # 10 秒 (60帧/秒 * 10)
+        self.damage_tick = 0
+        print("😱 HECATE 发出尖叫！全屏深粉色毒气爆发！")
+
+    def update(self, player):
+        if not self.active: return
+        
+        self.timer -= 1
+        if self.timer > 0:
+            # 粒子运动
+            for p in self.particles:
+                p['y'] -= p['speed'] 
+                p['x'] += math.sin(p['y'] * 0.05) * 1.5 
+                if p['y'] < -10:
+                    p['y'] = self.height + 10
+                    p['x'] = random.randint(0, self.width)
+                    
+            # 每秒钟扣血一次
+            self.damage_tick += 1
+            if self.damage_tick >= 60: 
+                self.damage_tick = 0
+                
+                # 【核心：锁血不死机制】
+                if player.hp > 1:
+                    player.hp -= 4
+                    # 如果扣完血发现死掉了，强行锁在 1 滴血！
+                    if player.hp < 1:
+                        player.hp = 1
+                        
+                    print(f"🩸 Boss毒气侵!失去生命，当前强制剩余 {player.hp}!")
+                    player.is_hurt = True
+                    if hasattr(player, 'hurt_timer'): player.hurt_timer = 30
+        else:
+            self.active = False
+
+    def draw(self, screen):
+        """渲染全屏深粉色毒气特效"""
+        if self.active and self.timer > 0:
+            screen.blit(self.vignette, (0, 0))
+            for p in self.particles:
+                pygame.draw.circle(screen, (255, 20, 147, 180), (int(p['x']), int(p['y'])), p['size'])
+
+
+# ----------------------------------------------------
+# Boss 专属 UI (结合了动态头像与毒气渲染黑科技)
+# ----------------------------------------------------
+class BossHealthBar:
+    def __init__(self):
+        self.font = pygame.font.Font(None, 36) 
+        self.portrait_bg = pygame.Surface((64, 64))
+        self.portrait_bg.fill((40, 40, 40))
+
+    def draw(self, screen, boss):
+        if not boss or boss.is_dead:
+            return
+            
+        # 【神级黑科技】：在画血条之前，利用已有的机制渲染全屏深粉色毒气！
+        # 这样毒气既能覆盖全屏，又不会遮挡住 Boss 自己的高贵血条。
+        if hasattr(boss, 'boss_gas'):
+            boss.boss_gas.draw(screen)
+            
+        screen_width = screen.get_width()
+        bar_width = 500  
+        bar_height = 24
+        
+        start_x = (screen_width - bar_width) // 2 + 100
+        start_y = 40  
+        
+        portrait_rect = pygame.Rect(start_x - 70, start_y - 20, 64, 64)
+        pygame.draw.rect(screen, (200, 180, 50), portrait_rect, 3) 
+        screen.blit(self.portrait_bg, (portrait_rect.x, portrait_rect.y))
+        
+        current_face = pygame.transform.scale(boss.image, (64, 64))
+        screen.blit(current_face, (portrait_rect.x, portrait_rect.y))
+        
+        name_text = self.font.render("HECATE", True, (255, 220, 100))
+        shadow_text = self.font.render("HECATE", True, (0, 0, 0))
+        screen.blit(shadow_text, (start_x + 2, start_y - 30))  
+        screen.blit(name_text, (start_x, start_y - 32))        
+        
+        bg_rect = pygame.Rect(start_x, start_y, bar_width, bar_height)
+        pygame.draw.rect(screen, (30, 30, 30), bg_rect)
+        pygame.draw.rect(screen, (150, 150, 150), bg_rect, 2) 
+        
+        health_ratio = max(0, boss.hp / getattr(boss, 'max_hp', 150))
+        current_health_width = int(bar_width * health_ratio)
+        if current_health_width > 0:
+            hp_rect = pygame.Rect(start_x, start_y, current_health_width, bar_height)
+            pygame.draw.rect(screen, (220, 20, 60), hp_rect)

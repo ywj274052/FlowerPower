@@ -5,7 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
-from level3_elements import PoisonZone, ToxicSludge, SwampMoth, PoisonToad, Hecate
+from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -535,10 +535,16 @@ def main():
     score = 0
     current_level = 1  # [新增] 游戏默认从第一关开始
 
-    # [新增] Member 3: 实例化毒沼泽
-    # 注意：确保在 main.py 最上方已经 from level3_elements import PoisonZone
-    poison_zones = pygame.sprite.Group()
+    # [新增] Member 3: 实例化毒气
     enemies = pygame.sprite.Group()
+
+    # [新增] 初始化毒气系统
+    poison_gas = PoisonGasSystem(1280, 720)
+
+    # [新增] Member 3: 初始化 Boss 相关的 UI 和警告特效
+    boss_warning = BossWarningEffect(SCREEN_WIDTH, SCREEN_HEIGHT) # 如果没定义 SCREEN_WIDTH，直接写 1280, 720
+    boss_ui = BossHealthBar()
+    active_boss = None
     
     running = True
     while running:
@@ -591,14 +597,6 @@ def main():
                     if player:
                         player.ground_y = 670  # <--- 直接设置玩家的 ground_y 属性
                         player.rect.bottom = 670
-                
-                    # 2. 在进入关卡时生成陷阱，这样它们就会贴合新的 GROUND_Y
-                    # 可以把陷阱放远一点（比如 x=800 和 x=1200），等你跑过去再出现
-                    poison_zones.empty() # 清空之前在代码顶部的旧陷阱
-                    zone1 = PoisonZone(800, GROUND_Y - 20, 200, 20)
-                    zone2 = PoisonZone(1200, GROUND_Y - 20, 150, 20)
-                    poison_zones.add(zone1, zone2)
-                    # --- [新增/修改部分结束] ---
 
                     # --- [修改] 波次控制与敌人系统 ---
                     camera_locked = False
@@ -623,8 +621,6 @@ def main():
                     show_tutorial = True
                     tutorial_timer = 0
                 
-
-        
         # ----- 更新 -----
         if game_state == "COMET":
             if comet:
@@ -644,12 +640,6 @@ def main():
         elif game_state == "PLAYING":
             if player:
                 player.update()
-
-                # Member 3: 毒沼泽伤害检测
-                if current_level == 3:
-                    poison_zones.update(player)
-
-                
                 
                 # 背景滚动与锁屏逻辑
                 if current_level == 3:
@@ -658,11 +648,6 @@ def main():
                     if keys[pygame.K_RIGHT] and not camera_locked:
                         bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
                         level_progress += 3  # 【新增这一行】记录累计行走距离
-
-                        # 关键：让所有的毒沼泽陷阱跟着背景一起向左后退！
-                        # 这样在视觉上，陷阱就死死钉在背景地面上了
-                        for zone in poison_zones:
-                            zone.rect.x -= 3
 
                    # ==========================================
                 # 【全新波次管理器】走 -> 锁屏打怪 -> 解锁 -> 走
@@ -678,6 +663,8 @@ def main():
                         if level_progress >= 800 and current_wave == 1:
                             camera_locked = True
                             print("🔒 触发警报！第 1 区域锁定！")
+                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 600, VISUAL_GROUND))
@@ -688,6 +675,8 @@ def main():
                         elif level_progress >= 1600 and current_wave == 2:
                             camera_locked = True
                             print("🔒 触发警报！第 2 区域锁定！")
+                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
@@ -698,26 +687,39 @@ def main():
                         elif level_progress >= 2400 and current_wave == 3:
                             camera_locked = True
                             print("🔒 触发警报！第 3 区域锁定！")
+                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
-                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
-                            enemies.add(SwampMoth(player.rect.x + 500, VISUAL_GROUND - 180))
+                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 130))
+                            enemies.add(SwampMoth(player.rect.x + 500, VISUAL_GROUND - 170))
                             enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 210))
-                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 240))
+                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 250))
                             enemies.add(PoisonToad(player.rect.x + 250, VISUAL_GROUND))
                             enemies.add(PoisonToad(player.rect.x - 1450, VISUAL_GROUND))
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True
                             print("⚠️ 最终区域锁定! Boss HECATE 降临！")
-                            # 召唤最终 Boss！(传入你想要的 X 坐标，Y 坐标使用地平线)
-                            enemies.add(Hecate(player.rect.x + 400, VISUAL_GROUND))
+
+                            # 1. 创建 Boss 并存入专属变量，方便血条系统随时读取它的血量
+                            active_boss = Hecate(player.rect.x - 600, VISUAL_GROUND)
+                        
+                            # 2. 把 Boss 加入普通怪物组，让它能正常被打到和渲染
+                            enemies.add(active_boss)
+                        
+                            # 3. 触发屏幕两侧爆红光特效！
+                            boss_warning.trigger()
                         
                     # 状态 B：已锁屏，玩家在战斗。怪物全死光就解锁
                     else:
                         if len(enemies) == 0:
                             camera_locked = False
+
+                            # 【新增】锁屏结束，调用毒气系统的结束方法，返还被扣掉的血量！
+                            poison_gas.end_wave(player)
+
                             current_wave += 1
                             if current_wave > 4:
                                 print("🎉 沼泽区域完全肃清！准备进入下一关！")
@@ -758,9 +760,12 @@ def main():
                 screen.blit(swamp_bg, (bg_x, 0))
                 # 画第二张图，紧紧贴在第一张图的右边
                 screen.blit(swamp_bg, (bg_x + 1280, 0))
-                for zone in poison_zones:
-                    zone.draw(screen)
-                    enemies.draw(screen)
+                
+                enemies.draw(screen)
+
+                for enemy in enemies:
+                    if hasattr(enemy, 'draw_health_bar'):
+                        enemy.draw_health_bar(screen)
             
             if player:
                 for seed in player.seed_shots:
@@ -825,6 +830,17 @@ def main():
                 screen.blit(player.image, player.rect)
             draw_game_over_screen(screen, player)
         
+        # 【新增】更新并绘制全屏毒气特效
+        poison_gas.update(player)
+        poison_gas.draw(screen)
+
+        # 1. 渲染红色警告特效
+        boss_warning.draw(screen)
+        
+        # 2. 渲染 Boss 血条
+        if active_boss and not active_boss.is_dead:
+            boss_ui.draw(screen, active_boss)
+
         pygame.display.flip()
         clock.tick(FPS)
     
