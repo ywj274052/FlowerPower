@@ -117,35 +117,40 @@ class Player(pygame.sprite.Sprite):
         self.death_animation_complete = False
 
     def take_damage(self, amount):
-        """受到伤害 (支持同帧群殴叠加伤害)"""
+        """受到伤害 (支持同帧群殴叠加伤害，被攻击会打断回血)"""
+        import pygame
         
-        # 1. 如果已经死了，直接忽略所有伤害
         if getattr(self, 'is_dead', False):
             return None
 
-        # 2. 获取当前时间的毫秒数，并初始化记录变量
         current_time = pygame.time.get_ticks()
         if not hasattr(self, 'last_hurt_time'):
             self.last_hurt_time = 0
 
         time_since_last_hit = current_time - self.last_hurt_time
 
-        # 3. 【核心判定】：如果玩家正在受伤(无敌帧)，且距离上次扣血超过了 10 毫秒，说明是普通的持续碰撞，拦截伤害！
-        # 反之，如果是 10 毫秒内的同时攻击，就会跳过这个 return，强制扣血！
         if self.is_hurt and time_since_last_hit >= 10:
             return None
 
-        # 4. 真正执行扣血
         self.hp -= amount
-        self.last_hurt_time = current_time # 刷新挨打时间
+        self.last_hurt_time = current_time 
         print(f"💥 受到 {amount} 点伤害！剩余 HP: {self.hp}")
 
         # ⭐️ 触发受伤状态 (强制播放受伤动画)
         self.is_hurt = True
-        self.hurt_timer = 30  # 受伤动画持续30帧
+        self.hurt_timer = 30  
         self.hurt_frame = 0
 
-        # 5. 原汁原味的死亡逻辑
+        # ==========================================
+        # 🛑 【核心修改】：受击仅强行打断回血
+        # ==========================================
+        if getattr(self, 'is_healing', False):
+            print("🚫 遭到攻击！回血被打断！")
+            self.is_healing = False
+            if hasattr(self, 'heal_timer'):
+                self.heal_timer = 0  # 清空回血计时器
+        # ==========================================
+
         if self.hp <= 0:
             self.hp = 0
             self.is_dead = True
@@ -344,8 +349,11 @@ class Player(pygame.sprite.Sprite):
         # ==========================================
         # member 3
         # 你的判定逻辑：没有按左右键，在地面上，没在飞
-        is_idle = (not keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT] 
-                   and self.is_on_ground and not getattr(self, 'is_flying', False))
+        # 【核心修复】：增加 and not self.is_hurt 判定
+        # 只要正在挨打僵直，就绝对不算在“待机休息”！
+        is_idle = (not keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]
+               and self.is_on_ground and not getattr(self, 'is_flying', False)
+               and not self.is_hurt)
 
         if is_idle and self.hp < self.max_hp:
             self.idle_timer += 1
