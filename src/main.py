@@ -620,12 +620,22 @@ def main():
                             print("💀 玩家死亡！游戏结束！")
                             game_state = "GAME_OVER"
 
-                # Member 2 developer shortcut: jump directly into Level 2.
-                if event.key == pygame.K_2 and game_state == "PLAYING":
+                # Member 2 shortcut: jump directly into Level 2 from title or gameplay.
+                if event.key in (pygame.K_2, pygame.K_KP2) and game_state in ("TITLE", "PLAYING"):
+                    if player is None:
+                        player = Player(100, GROUND_Y - 128)
+                    game_state = "PLAYING"
+                    show_tutorial = False
+                    tutorial_timer = 0
                     enter_level2(player)
 
                 # Developer shortcut: jump directly into Level 3.
-                if event.key == pygame.K_3 and game_state == "PLAYING":
+                if event.key in (pygame.K_3, pygame.K_KP3) and game_state in ("TITLE", "PLAYING"):
+                    if player is None:
+                        player = Player(100, GROUND_Y - 128)
+                    game_state = "PLAYING"
+                    show_tutorial = False
+                    tutorial_timer = 0
                     enter_level3(player)
                 
                 if game_state == "TITLE" and event.key == pygame.K_RETURN:
