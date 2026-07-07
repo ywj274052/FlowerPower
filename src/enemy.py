@@ -302,11 +302,24 @@ class Level2Scene:
         if not player:
             return
         for enemy in self.enemies:
-            if enemy.damage_cooldown <= 0 and enemy.rect.colliderect(player.rect):
+            if enemy.damage_cooldown <= 0 and self._enemy_can_damage_player(enemy, player):
                 result = player.take_damage(enemy.damage)
                 enemy.damage_cooldown = 55
                 if result == "GAME_OVER":
                     break
+
+    def _enemy_can_damage_player(self, enemy, player):
+        player_hitbox = player.rect.inflate(-36, -28)
+        enemy_hitbox = enemy.rect.inflate(-int(enemy.rect.width * 0.35), -int(enemy.rect.height * 0.35))
+
+        if not enemy_hitbox.colliderect(player_hitbox):
+            return False
+
+        # Prevent enemies walking below a platform from damaging the player above it.
+        if player.rect.bottom < enemy.rect.centery:
+            return False
+
+        return True
 
     def _handle_attacks(self, player):
         gained_score = 0
