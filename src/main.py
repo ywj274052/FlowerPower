@@ -5,6 +5,7 @@ import random
 import os
 from settings import *
 from player import Player, SeedShot
+from enemy import Level2Scene
 from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar
 
 # ---------- 全局变量 ----------
@@ -531,9 +532,12 @@ def main():
     player = None
     comet = None
     shake_frames = 0
+    swamp_bg = None
+    bg_x = 0
 
     score = 0
     current_level = 1  # [新增] 游戏默认从第一关开始
+    level2_scene = Level2Scene()
 
     # [新增] Member 3: 实例化毒气
     enemies = pygame.sprite.Group()
@@ -545,6 +549,41 @@ def main():
     boss_warning = BossWarningEffect(SCREEN_WIDTH, SCREEN_HEIGHT) # 如果没定义 SCREEN_WIDTH，直接写 1280, 720
     boss_ui = BossHealthBar()
     active_boss = None
+
+    def enter_level2(player_obj):
+        global current_level, GROUND_Y, camera_locked, current_wave, level_progress
+        current_level = 2
+        GROUND_Y = SCREEN_HEIGHT - GROUND_HEIGHT
+        camera_locked = False
+        current_wave = 1
+        level_progress = 0
+        enemies.empty()
+        level2_scene.reset(player_obj)
+        play_level_bgm(2)
+        print("🌲 Level 2 loaded: Dark Forest - Member 2 scene")
+
+    def enter_level3(player_obj):
+        nonlocal swamp_bg, bg_x, active_boss
+        global current_level, GROUND_Y, camera_locked, current_wave, level_progress
+
+        current_level = 3
+        print("🌀 Level 3 loaded: Swamp Ruins")
+        play_level_bgm(3)
+
+        GROUND_Y = 670
+        if player_obj:
+            player_obj.ground_y = 670
+            player_obj.rect.bottom = 670
+
+        camera_locked = False
+        current_wave = 1
+        level_progress = 0
+        enemies.empty()
+        active_boss = None
+
+        swamp_bg = pygame.image.load("assets/sprites/backgrounds/1_game_background.png").convert()
+        swamp_bg = pygame.transform.scale(swamp_bg, (1280, 720))
+        bg_x = 0
     
     running = True
     while running:
@@ -581,37 +620,13 @@ def main():
                             print("💀 玩家死亡！游戏结束！")
                             game_state = "GAME_OVER"
 
-                # [新增] 开发者测试键：按数字键 3 传送到 Level 3
+                # Member 2 developer shortcut: jump directly into Level 2.
+                if event.key == pygame.K_2 and game_state == "PLAYING":
+                    enter_level2(player)
+
+                # Developer shortcut: jump directly into Level 3.
                 if event.key == pygame.K_3 and game_state == "PLAYING":
-
-                    current_level = 3
-                    print("🌀 开发者模式：已传送到 Level 3 - 沼泽废墟！")
-                    play_level_bgm(3) # 瞬间切换成你的沼泽 BGM！
-
-                    # --- [新增/修改部分开始] ---
-                    # 1. 动态调低物理地面的高度
-                    GROUND_Y = 670
-
-                    # 【关键 3】强制让玩家落到新的地面上
-                    # 假设 Member 1 的 Player 类的碰撞箱底部是对齐地面的
-                    if player:
-                        player.ground_y = 670  # <--- 直接设置玩家的 ground_y 属性
-                        player.rect.bottom = 670
-
-                    # --- [修改] 波次控制与敌人系统 ---
-                    camera_locked = False
-                    current_wave = 1      # 从第 1 波开始准备
-                    level_progress = 0    # 【新增】用来记录你在这一关总共往前走了多远
-                    enemies.empty()       # 传送时清空旧怪物，防止 Bug
-                    # --------------------------------
-
-                    # 加载你的沼泽背景，并强制缩放到 1280x720 适应屏幕
-                    swamp_bg = pygame.image.load("assets/sprites/backgrounds/1_game_background.png").convert()
-                    swamp_bg = pygame.transform.scale(swamp_bg, (1280, 720))
-    
-                    # 增加两个控制背景滚动的核心变量
-                    bg_x = 0                # 背景当前的 X 坐标
-                    camera_locked = False   # 锁屏机制的“锁”
+                    enter_level3(player)
                 
                 if game_state == "TITLE" and event.key == pygame.K_RETURN:
                     print("☄️ 彗星坠落事件启动！")
@@ -640,6 +655,12 @@ def main():
         elif game_state == "PLAYING":
             if player:
                 player.update()
+
+                if current_level == 2:
+                    level_score, transition = level2_scene.update(player)
+                    score += level_score
+                    if transition == "LEVEL_COMPLETE":
+                        enter_level3(player)
                 
                 # 背景滚动与锁屏逻辑
                 if current_level == 3:
@@ -753,6 +774,10 @@ def main():
         elif game_state == "PLAYING":
             screen.blit(background, (0, 0))
             pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
+
+            # Member 2: Dark Forest scene.
+            if current_level == 2:
+                level2_scene.draw(screen)
 
             # [新增] Member 3: 绘制毒沼泽
             if current_level == 3:
