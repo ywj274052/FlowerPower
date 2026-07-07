@@ -89,14 +89,15 @@ class BlightBeetle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(midbottom=(x, y))
 
     def _load_frames(self):
-        path = os.path.join(BASE_DIR, "assets", "sprites", "enemies", "Walk.png")
+        enemy_folder = "level2_armoured_beetle" if self.variant == "armoured" else "level2_blight_beetle"
+        path = os.path.join(BASE_DIR, "assets", "sprites", "enemies", enemy_folder, "Walk.png")
         frames = []
         if os.path.exists(path):
             sheet = pygame.image.load(path).convert_alpha()
-            frame_count = 7
+            frame_count = 6
             frame_width = sheet.get_width() // frame_count
             frame_height = sheet.get_height()
-            scale = 1.0 if self.variant == "standard" else 1.18
+            scale = 1.45 if self.variant == "standard" else 1.55
             for index in range(frame_count):
                 frame = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
                 frame.blit(sheet, (0, 0), (index * frame_width, 0, frame_width, frame_height))
@@ -104,10 +105,6 @@ class BlightBeetle(pygame.sprite.Sprite):
                     frame,
                     (int(frame_width * scale), int(frame_height * scale)),
                 )
-                if self.variant == "armoured":
-                    armour = pygame.Surface(frame.get_size(), pygame.SRCALPHA)
-                    armour.fill((90, 120, 180, 80))
-                    frame.blit(armour, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
                 frames.append(frame)
 
         if not frames:
@@ -140,7 +137,7 @@ class BlightBeetle(pygame.sprite.Sprite):
             flash = frame.copy()
             flash.fill((80, 220, 200, 90), special_flags=pygame.BLEND_RGBA_ADD)
             frame = flash
-        self.image = pygame.transform.flip(frame, self.direction > 0, False)
+        self.image = pygame.transform.flip(frame, self.direction < 0, False)
 
     def _keep_on_platform(self, platforms):
         for platform in platforms:
@@ -244,8 +241,7 @@ class Level2Scene:
 
     def _load_background(self):
         candidates = [
-            os.path.join(BASE_DIR, "assets", "sprites", "backgrounds", "orig.png"),
-            os.path.join(BASE_DIR, "assets", "sprites", "backgrounds", "1_game_background.png"),
+            os.path.join(BASE_DIR, "assets", "sprites", "backgrounds", "level2_dark_forest", "background.png"),
         ]
         for path in candidates:
             if os.path.exists(path):
