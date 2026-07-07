@@ -137,7 +137,7 @@ class BlightBeetle(pygame.sprite.Sprite):
             flash = frame.copy()
             flash.fill((80, 220, 200, 90), special_flags=pygame.BLEND_RGBA_ADD)
             frame = flash
-        self.image = pygame.transform.flip(frame, self.direction < 0, False)
+        self.image = pygame.transform.flip(frame, self.direction > 0, False)
 
     def _keep_on_platform(self, platforms):
         for platform in platforms:
