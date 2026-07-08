@@ -188,47 +188,134 @@ class Comet(pygame.sprite.Sprite):
 # ---------- 绘制函数 ----------
 def draw_title_screen(screen):
     background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-    background.fill((34, 139, 34))
+    for y in range(SCREEN_HEIGHT):
+        t = y / SCREEN_HEIGHT
+        r = int(12 + 12 * t)
+        g = int(72 + 55 * t)
+        b = int(44 + 8 * t)
+        pygame.draw.line(background, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+
+    # Original painted forest silhouettes for the title page. This avoids reusing any
+    # level owner's background asset while still matching the flora theme.
+    for i in range(12):
+        x = i * 145 - 80
+        trunk_color = (35, 48, 24) if i % 2 else (42, 58, 30)
+        pygame.draw.rect(background, trunk_color, (x + 48, 92 + (i % 3) * 18, 36, SCREEN_HEIGHT), border_radius=18)
+        pygame.draw.circle(background, (12, 72, 42), (x + 70, 105), 92)
+        pygame.draw.circle(background, (16, 86, 48), (x + 20, 145), 72)
+        pygame.draw.circle(background, (18, 95, 55), (x + 120, 150), 78)
+    for i in range(18):
+        x = i * 92
+        pygame.draw.polygon(
+            background,
+            (9, 60, 35),
+            [(x - 35, 230), (x + 40, 90 + (i % 4) * 18), (x + 115, 230)],
+        )
     screen.blit(background, (0, 0))
-    
+
+    # Dark forest-green wash so the title reads clearly over the artwork.
+    wash = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    wash.fill((7, 42, 25, 135))
+    screen.blit(wash, (0, 0))
+
+    # Soft radial glow behind the logo.
+    glow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    for radius in range(360, 40, -20):
+        alpha = max(0, 46 - radius // 10)
+        pygame.draw.circle(glow, (142, 255, 177, alpha), (SCREEN_WIDTH // 2, 290), radius)
+    screen.blit(glow, (0, 0))
+
+    ticks = pygame.time.get_ticks()
+    for i in range(26):
+        x = (i * 97 + int(ticks * 0.018)) % SCREEN_WIDTH
+        y = 105 + int(70 * math.sin(ticks * 0.0012 + i * 0.75)) + (i * 23) % 420
+        size = 2 + (i % 3)
+        alpha = 55 + int(45 * abs(math.sin(ticks * 0.002 + i)))
+        pygame.draw.circle(screen, (190, 255, 188, alpha), (x, y), size)
+
     try:
-        title_font = pygame.font.Font(None, 180)
-        subtitle_font = pygame.font.Font(None, 80)
-        prompt_font = pygame.font.Font(None, 50)
+        title_font = pygame.font.Font(None, 172)
+        subtitle_font = pygame.font.Font(None, 58)
+        prompt_font = pygame.font.Font(None, 42)
+        small_font = pygame.font.Font(None, 28)
     except:
-        title_font = pygame.font.SysFont("Arial", 180)
-        subtitle_font = pygame.font.SysFont("Arial", 80)
-        prompt_font = pygame.font.SysFont("Arial", 50)
-    
-    title_text = title_font.render("FlowerPower", True, (255, 255, 255))
-    shadow_text = title_font.render("FlowerPower", True, (0, 0, 0))
-    shadow_rect = shadow_text.get_rect(center=(SCREEN_WIDTH // 2 + 5, 255))
-    title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
+        title_font = pygame.font.SysFont("Georgia", 172, bold=True)
+        subtitle_font = pygame.font.SysFont("Georgia", 58, bold=True)
+        prompt_font = pygame.font.SysFont("Arial", 42, bold=True)
+        small_font = pygame.font.SysFont("Arial", 28)
+
+    title = "FlowerPower"
+    shadow_text = title_font.render(title, True, (7, 20, 12))
+    shadow_rect = shadow_text.get_rect(center=(SCREEN_WIDTH // 2 + 7, 250 + 8))
     screen.blit(shadow_text, shadow_rect)
+
+    title_text = title_font.render(title, True, (248, 255, 232))
+    title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
     screen.blit(title_text, title_rect)
-    
-    subtitle_text = subtitle_font.render("Bloom Guardian", True, (255, 215, 0))
-    subtitle_rect = subtitle_text.get_rect(center=(SCREEN_WIDTH // 2, 350))
+
+    # Thin gold underline, more polished than a flat text stack.
+    underline_width = int(title_rect.width * 0.62)
+    underline_y = title_rect.bottom + 4
+    pygame.draw.line(
+        screen,
+        (255, 219, 82),
+        (SCREEN_WIDTH // 2 - underline_width // 2, underline_y),
+        (SCREEN_WIDTH // 2 + underline_width // 2, underline_y),
+        4,
+    )
+
+    subtitle_text = subtitle_font.render("Bloom Guardian", True, (255, 225, 90))
+    subtitle_rect = subtitle_text.get_rect(center=(SCREEN_WIDTH // 2, 380))
     screen.blit(subtitle_text, subtitle_rect)
-    
+
+    tag_text = small_font.render("A flora-themed side-scrolling adventure", True, (208, 235, 205))
+    tag_rect = tag_text.get_rect(center=(SCREEN_WIDTH // 2, 426))
+    screen.blit(tag_text, tag_rect)
+
     alpha = 128 + int(127 * abs(math.sin(pygame.time.get_ticks() / 500)))
-    prompt_text = prompt_font.render("Press ENTER to Start", True, (255, 255, 200))
+    prompt_box = pygame.Rect(0, 0, 390, 62)
+    prompt_box.center = (SCREEN_WIDTH // 2, 535)
+    pygame.draw.rect(screen, (9, 45, 25), prompt_box, border_radius=18)
+    pygame.draw.rect(screen, (242, 213, 93), prompt_box, 2, border_radius=18)
+
+    prompt_text = prompt_font.render("Press ENTER to Start", True, (255, 245, 175))
     prompt_text.set_alpha(alpha)
-    prompt_rect = prompt_text.get_rect(center=(SCREEN_WIDTH // 2, 480))
+    prompt_rect = prompt_text.get_rect(center=prompt_box.center)
     screen.blit(prompt_text, prompt_rect)
-    
-    draw_flower(screen, 150, SCREEN_HEIGHT - 100, (255, 200, 50))
-    draw_flower(screen, 200, SCREEN_HEIGHT - 150, (255, 100, 150))
-    draw_flower(screen, SCREEN_WIDTH - 150, SCREEN_HEIGHT - 100, (255, 200, 50))
-    draw_flower(screen, SCREEN_WIDTH - 200, SCREEN_HEIGHT - 150, (255, 100, 150))
+
+    hint_text = small_font.render("2: Level 2 Test    3: Level 3 Test    Esc: Quit", True, (174, 208, 170))
+    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 588))
+    screen.blit(hint_text, hint_rect)
+
+    # Foreground ground strip and flowers frame the screen without feeling empty.
+    pygame.draw.rect(screen, (11, 62, 30), (0, SCREEN_HEIGHT - 88, SCREEN_WIDTH, 88))
+    pygame.draw.rect(screen, (37, 118, 52), (0, SCREEN_HEIGHT - 96, SCREEN_WIDTH, 12))
+    for x in range(0, SCREEN_WIDTH, 34):
+        blade_h = 14 + (x * 7) % 28
+        pygame.draw.line(screen, (62, 155, 67), (x, SCREEN_HEIGHT - 84), (x + 10, SCREEN_HEIGHT - 84 - blade_h), 3)
+
+    flower_positions = [
+        (125, SCREEN_HEIGHT - 60, (255, 208, 67), 1.1),
+        (205, SCREEN_HEIGHT - 118, (255, 111, 166), 0.95),
+        (SCREEN_WIDTH - 150, SCREEN_HEIGHT - 64, (255, 208, 67), 1.1),
+        (SCREEN_WIDTH - 230, SCREEN_HEIGHT - 118, (255, 111, 166), 0.95),
+        (SCREEN_WIDTH // 2 - 440, SCREEN_HEIGHT - 44, (177, 233, 97), 0.75),
+        (SCREEN_WIDTH // 2 + 440, SCREEN_HEIGHT - 44, (177, 233, 97), 0.75),
+    ]
+    for x, y, color, scale in flower_positions:
+        draw_flower(screen, x, y, color, scale)
 
 
-def draw_flower(screen, x, y, color):
-    pygame.draw.circle(screen, color, (x, y - 12), 10)
-    pygame.draw.circle(screen, color, (x + 12, y), 10)
-    pygame.draw.circle(screen, color, (x, y + 12), 10)
-    pygame.draw.circle(screen, color, (x - 12, y), 10)
-    pygame.draw.circle(screen, (255, 255, 0), (x, y), 8)
+def draw_flower(screen, x, y, color, scale=1.0):
+    petal = max(5, int(10 * scale))
+    offset = max(7, int(12 * scale))
+    center = max(4, int(8 * scale))
+    pygame.draw.line(screen, (69, 150, 63), (x, y + offset + 18), (x, y + 8), max(2, int(4 * scale)))
+    pygame.draw.circle(screen, color, (x, y - offset), petal)
+    pygame.draw.circle(screen, color, (x + offset, y), petal)
+    pygame.draw.circle(screen, color, (x, y + offset), petal)
+    pygame.draw.circle(screen, color, (x - offset, y), petal)
+    pygame.draw.circle(screen, (255, 246, 52), (x, y), center)
 
 
 def draw_comet_scene(screen, comet, background):
