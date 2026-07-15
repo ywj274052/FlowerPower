@@ -71,3 +71,6 @@ MAX_HP = 100
 IDLE_HEAL_AMOUNT = 5      # 每秒回复 HP
 IDLE_HEAL_DELAY = 180     # 站立 3 秒后开始回血（60fps × 3）
 HURT_FLASH_DURATION = 10  # 受伤闪红帧数
+
+# 传送门设置
+PORTAL_ACTIVATE_DELAY = 60  # 传送门出现后的等待帧数
