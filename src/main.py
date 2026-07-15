@@ -6,7 +6,7 @@ import os
 from settings import *
 from player import Player, SeedShot
 from enemy import Level2Scene
-from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar, HitEffect
+from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar, HitEffect, LevelBanner
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -640,6 +640,9 @@ def main():
     boss_ui = BossHealthBar()
     active_boss = None
 
+    # Member 3: 初始化关卡开场字样横幅
+    level_banner = LevelBanner("Level 3", 1280)
+
     def enter_level2(player_obj):
         global current_level, GROUND_Y, camera_locked, current_wave, level_progress
         current_level = 2
@@ -883,6 +886,10 @@ def main():
                 screen.blit(swamp_bg, (bg_x, 0))
                 # 画第二张图，紧紧贴在第一张图的右边
                 screen.blit(swamp_bg, (bg_x + 1280, 0))
+
+                # 【核心新增】：更新并绘制 Level 3 开场大字
+                level_banner.update()
+                level_banner.draw(screen)
                 
                 enemies.draw(screen)
 

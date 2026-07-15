@@ -1403,3 +1403,53 @@ class HitEffect(pygame.sprite.Sprite):
             # 3. 中心极高亮的白点，模拟金属碰撞的核心
             core_radius = max(1, 8 - int(7 * progress))
             pygame.draw.circle(self.image, (255, 255, 255, alpha), (center, center), core_radius)
+
+# ==========================================
+# 关卡开场文字横幅 (渐变特效)
+# ==========================================
+class LevelBanner:
+    """关卡开场大字提示：渐变出现 -> 保持 -> 渐变消失"""
+    def __init__(self, text="Level 3", screen_width=1280):
+        # 使用安全的内置默认字体，字号设为 80（足够大且醒目）
+        self.font = pygame.font.Font(None, 80)
+        self.text = text
+        self.screen_width = screen_width
+        
+        # 1. 预先渲染好文字表面 (使用亮眼且带有一点史诗感的金色)
+        self.text_surf = self.font.render(self.text, True, (255, 215, 0))
+        
+        # 2. 计算居中位置：屏幕上方正中间 (Y 轴设在 80 像素处)
+        self.rect = self.text_surf.get_rect(center=(self.screen_width // 2, 80))
+        
+        # 3. 核心控制变量
+        self.alpha = 0              # 初始透明度为 0 (完全透明)
+        self.state = 'fade_in'      # 初始状态：渐入
+        self.hold_timer = 0         # 保持状态的计时器
+
+    def update(self):
+        """每帧调用，更新透明度和动画状态机"""
+        if self.state == 'fade_in':
+            self.alpha += 5         # 每帧增加 5 点透明度
+            if self.alpha >= 255:
+                self.alpha = 255
+                self.state = 'hold'  # 达到全显，切换到保持状态
+                self.hold_timer = 0
+                
+        elif self.state == 'hold':
+            self.hold_timer += 1
+            if self.hold_timer >= 90: # 在屏幕上保持 1.5 秒 (60帧/秒 * 1.5 = 90帧)
+                self.state = 'fade_out'
+                
+        elif self.state == 'fade_out':
+            self.alpha -= 5         # 每帧减少 5 点透明度
+            if self.alpha <= 0:
+                self.alpha = 0
+                self.state = 'done'  # 动画完全结束
+
+    def draw(self, screen):
+        """如果动画没结束，就将其画到屏幕上"""
+        if self.state != 'done':
+            # 【核心原理】：必须复制一份文字画布再应用透明度，否则会污染原画布
+            temp_surf = self.text_surf.copy()
+            temp_surf.set_alpha(self.alpha)
+            screen.blit(temp_surf, self.rect)
