@@ -12,6 +12,12 @@ from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad,
 game_state = "TITLE"
 tutorial_timer = 0 
 show_tutorial = True  
+portal = None
+show_portal = False
+level1_complete = False
+flower_timer = 0
+show_flower = False
+flower_grow_complete = False
 
 # ---------- 彗星类 ----------
 class Comet(pygame.sprite.Sprite):
@@ -184,6 +190,55 @@ class Comet(pygame.sprite.Sprite):
             if size > 3:
                 glow_color = (255, 200, 100, alpha // 3)
                 pygame.draw.circle(screen, glow_color[:3], (int(p['x']), int(p['y'])), int(size * 2))
+
+class Portal(pygame.sprite.Sprite):
+    """传送门类 - 连接 Level 1 到 Level 2"""
+    def __init__(self, x, y):
+        super().__init__()
+        self.size = 60
+        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.animation_timer = 0
+        self.active = False
+        self.update_image()
+    
+    def update_image(self):
+        """绘制传送门（紫色发光圈）"""
+        self.image.fill((0, 0, 0, 0))
+        center = self.size // 2
+        
+        # 外圈发光
+        for radius in range(28, 10, -2):
+            alpha = 30 + int(50 * (radius / 28))
+            color = (150, 50, 255, alpha)
+            pygame.draw.circle(self.image, color, (center, center), radius)
+        
+        # 主圈
+        pygame.draw.circle(self.image, (100, 50, 200, 180), (center, center), 24)
+        pygame.draw.circle(self.image, (150, 80, 255, 200), (center, center), 18)
+        pygame.draw.circle(self.image, (200, 150, 255, 220), (center, center), 10)
+        
+        # 内圈亮点
+        pygame.draw.circle(self.image, (255, 255, 255, 150), (center - 6, center - 6), 5)
+        
+        # 旋转粒子效果
+        self.animation_timer += 1
+        angle = self.animation_timer * 0.1
+        for i in range(8):
+            px = center + int(20 * math.cos(angle + i * math.pi / 4))
+            py = center + int(20 * math.sin(angle + i * math.pi / 4))
+            alpha = 100 + int(155 * abs(math.sin(angle + i * math.pi / 4)))
+            pygame.draw.circle(self.image, (200, 150, 255, alpha), (px, py), 4)
+    
+    def update(self):
+        """更新传送门动画"""
+        self.update_image()
+    
+    def activate(self):
+        """激活传送门"""
+        self.active = True
+        print("🚪 传送门已激活！")
 
 # ---------- 绘制函数 ----------
 def draw_title_screen(screen):
@@ -515,40 +570,42 @@ def draw_tutorial_text(screen):
         small_font = pygame.font.SysFont("Arial", 24)
     
     # 半透明背景
-    bg_width = 400
-    bg_height = 210
+    bg_width = 420
+    bg_height = 280
     bg_x = SCREEN_WIDTH // 2 - bg_width // 2
-    bg_y = SCREEN_HEIGHT - 230
+    bg_y = SCREEN_HEIGHT - 300
     
     bg_surface = pygame.Surface((bg_width, bg_height), pygame.SRCALPHA)
-    bg_surface.fill((0, 0, 0, 160))
+    bg_surface.fill((0, 0, 0, 180))
     pygame.draw.rect(bg_surface, (255, 255, 255, 60), (0, 0, bg_width, bg_height), 2)
     screen.blit(bg_surface, (bg_x, bg_y))
     
     title_text = font.render("🎮 Controls", True, (255, 215, 0))
-    screen.blit(title_text, (bg_x + 20, bg_y + 10))
+    screen.blit(title_text, (bg_x + 20, bg_y + 12))
     
     controls = [
         ("<-/->", "Move"),
         ("Space", "Jump"),
         ("W", "Fly"),
-        ("X", "Seed Shot (Ranged)")
+        ("X", "Seed Shot (Ranged)"),
+        ("K", "Open Portal (Level 1)")
     ]
     
-    y_offset = 50
+    y_offset = 52
+    line_height = 28  
     for key, action in controls:
         key_text = small_font.render(key, True, (255, 200, 50))
         screen.blit(key_text, (bg_x + 20, bg_y + y_offset))
         action_text = small_font.render(f"→ {action}", True, (220, 220, 220))
         screen.blit(action_text, (bg_x + 100, bg_y + y_offset))
-        y_offset += 25
+        y_offset += line_height
     
     alpha = 100 + int(155 * abs(math.sin(pygame.time.get_ticks() / 500)))
     hint_text = small_font.render("Press H to test damage", True, (255, 100, 100))
     hint_text.set_alpha(alpha)
     screen.blit(hint_text, (bg_x + 20, bg_y + y_offset + 5))
     
-    # ⭐ 按 O 键开关教程
+    #  按 O 键开关教程
     toggle_text = small_font.render("Press O to toggle this tutorial", True, (200, 200, 200))
     screen.blit(toggle_text, (bg_x + 20, bg_y + y_offset + 30))
 
@@ -598,11 +655,152 @@ def draw_game_over_screen(screen, player):
     quit_rect = quit_text.get_rect(center=(SCREEN_WIDTH // 2, 560))
     screen.blit(quit_text, quit_rect)
 
+def draw_flower_grow_animation(screen, timer):
+    """绘制花生长动画"""
+    # 半透明背景（淡入效果）
+    if timer < 30:
+        alpha = int(255 * (timer / 30))
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 255 - alpha))
+        screen.blit(overlay, (0, 0))
+    
+    # 花的位置（屏幕中央偏下）
+    center_x = SCREEN_WIDTH // 2
+    center_y = GROUND_Y - 60
+    
+    # 根据时间计算花的生长进度
+    grow_progress = min(1.0, timer / 90)
+    
+    # 花的大小（从 0 逐渐长大）
+    flower_scale = 0.3 + 0.7 * grow_progress
+    
+    # 绘制发光效果
+    glow_radius = int(80 * flower_scale)
+    glow_alpha = int(80 * (1 - timer / 120))
+    glow = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+    pygame.draw.circle(glow, (255, 200, 100, glow_alpha), (glow_radius, glow_radius), glow_radius)
+    screen.blit(glow, (center_x - glow_radius, center_y - glow_radius))
+    
+    # 绘制花
+    draw_flower_big(screen, center_x, center_y, flower_scale, timer)
+    
+    # 绘制粒子效果（花瓣飘落）
+    if timer > 30:
+        for i in range(10):
+            angle = timer * 0.05 + i * 2.5
+            x = center_x + int(120 * math.cos(angle + i) * flower_scale)
+            y = center_y - 50 + int(80 * math.sin(angle * 0.7 + i) * flower_scale) + timer * 0.5
+            size = int(3 + 4 * (1 - timer / 180))
+            if size > 1 and y < SCREEN_HEIGHT - 50:
+                color = (255, 200, 100 + i * 10)
+                pygame.draw.circle(screen, color, (x, int(y)), size)
+    
+    # 文字提示（闪烁）
+    if timer > 60:
+        alpha = 128 + int(127 * abs(math.sin(timer * 0.05)))
+        try:
+            font = pygame.font.Font(None, 40)
+        except:
+            font = pygame.font.SysFont("Arial", 40)
+        text = font.render("🌸 A flower is blooming...", True, (255, 255, 200))
+        text.set_alpha(alpha)
+        text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, 150))
+        screen.blit(text, text_rect)
+
+
+def draw_flower_big(screen, x, y, scale, timer):
+    """绘制一朵大花（用于花变玩家动画）"""
+    petal_size = int(30 * scale)
+    center_size = int(15 * scale)
+    
+    # 花茎（从地面长出）
+    stem_height = int(40 * scale)
+    stem_color = (50, 180, 70)
+    pygame.draw.line(screen, stem_color, (x, y + stem_height), (x, y), max(3, int(4 * scale)))
+    
+    # 叶片（随时间展开）
+    if timer > 20:
+        leaf_angle = math.sin(timer * 0.03) * 0.3
+        for side in [-1, 1]:
+            leaf_x = x + side * int(20 * scale)
+            leaf_y = y + int(20 * scale)
+            pygame.draw.ellipse(
+                screen,
+                (60, 200, 80),
+                (leaf_x - side * int(15 * scale), leaf_y - int(5 * scale), int(20 * scale), int(12 * scale))
+            )
+    
+    # 花瓣（6片）
+    colors = [
+        (255, 180, 200),
+        (255, 150, 180),
+        (255, 200, 180),
+        (255, 160, 210),
+        (255, 210, 160),
+        (255, 130, 190)
+    ]
+    
+    for i in range(6):
+        angle = math.radians(i * 60 + timer * 0.5)
+        px = x + int(petal_size * 1.2 * math.cos(angle))
+        py = y + int(petal_size * 1.2 * math.sin(angle) * 0.7)
+        
+        # 花瓣形状（椭圆）
+        petal_rect = pygame.Rect(
+            px - petal_size // 2,
+            py - petal_size // 3,
+            petal_size,
+            int(petal_size * 0.7)
+        )
+        pygame.draw.ellipse(screen, colors[i % len(colors)], petal_rect)
+    
+    # 花蕊（发光）
+    for r in range(center_size, 0, -2):
+        alpha = 150 + int(50 * abs(math.sin(timer * 0.05)))
+        color = (255, 215, 50 + r * 2)
+        pygame.draw.circle(screen, color, (x, y), r)
+    
+    # 花蕊中心高光
+    pygame.draw.circle(screen, (255, 255, 200), (x - 2, y - 2), int(center_size * 0.3))
+    
+    # 金色光晕
+    glow = pygame.Surface((center_size * 4, center_size * 4), pygame.SRCALPHA)
+    glow_alpha = 50 + int(30 * abs(math.sin(timer * 0.03)))
+    pygame.draw.circle(glow, (255, 200, 50, glow_alpha), (center_size * 2, center_size * 2), center_size * 2)
+    screen.blit(glow, (x - center_size * 2, y - center_size * 2))
+
+def draw_level_complete_text(screen):
+    """绘制关卡完成提示"""
+    try:
+        font = pygame.font.Font(None, 60)
+        small_font = pygame.font.Font(None, 36)
+    except:
+        font = pygame.font.SysFont("Arial", 60)
+        small_font = pygame.font.SysFont("Arial", 36)
+    
+    bg_width = 500
+    bg_height = 150
+    bg_x = SCREEN_WIDTH // 2 - bg_width // 2
+    bg_y = 200
+    
+    bg_surface = pygame.Surface((bg_width, bg_height), pygame.SRCALPHA)
+    bg_surface.fill((0, 0, 0, 180))
+    pygame.draw.rect(bg_surface, (255, 215, 0, 80), (0, 0, bg_width, bg_height), 3)
+    screen.blit(bg_surface, (bg_x, bg_y))
+    
+    title_text = font.render("🎉 Level 1 Complete!", True, (255, 215, 0))
+    title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 260))
+    screen.blit(title_text, title_rect)
+    
+    hint_text = small_font.render("Walk into the portal to enter Level 2!", True, WHITE)
+    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 320))
+    screen.blit(hint_text, hint_rect)    
+
 
 # ---------- 主函数 ----------
 def main():
-    # 所有 global 声明放在最开头
     global game_state, tutorial_timer, show_tutorial, current_level, GROUND_Y, camera_locked, current_wave, enemies, level_progress
+    global portal, show_portal, level1_complete, flower_timer, show_flower, flower_grow_complete
     
     pygame.init()
     pygame.mixer.init()
@@ -612,6 +810,14 @@ def main():
     
     tutorial_timer = 0
     show_tutorial = True
+
+    portal = None
+    show_portal = False
+    level1_complete = False
+
+    flower_timer = 0
+    show_flower = False
+    flower_grow_complete = False
     
     background = pygame.image.load(BACKGROUND_FILE).convert()
     background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -751,13 +957,48 @@ def main():
         elif game_state == "SHAKE":
             shake_frames -= 1
             if shake_frames <= 0:
-                print("🎮 游戏开始！")
+                print("🌸 花之诞生！")
+                game_state = "FLOWER"  # ⭐ 先进入花的状态
+                show_flower = True
+                flower_timer = 0
+                flower_grow_complete = False
+                play_level_bgm(1)
+        
+        elif game_state == "FLOWER":
+            flower_timer += 1
+            # 花生长动画持续 2 秒（120帧），然后变成玩家
+            if flower_timer >= 120:
+                flower_grow_complete = True
                 game_state = "PLAYING"
-                play_level_bgm(1) #member3 music
+                print("🌱 花变成了 Florina！")
+                # 创建玩家（如果还没有）
+                if player is None:
+                    player = Player(SCREEN_WIDTH // 2 - 64, GROUND_Y - 128)
+                # 重置花状态
+                show_flower = False
+
         
         elif game_state == "PLAYING":
             if player:
                 player.update()
+
+                if current_level == 1:
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_k] and not level1_complete:
+                        level1_complete = True
+                        show_portal = True
+                        portal = Portal(SCREEN_WIDTH - 150, GROUND_Y - 60)
+                        portal.activate()
+                        print("🎯 Level 1 完成！传送门已出现！")
+                    
+                    if portal:
+                        portal.update()
+                        if portal.active and player.rect.colliderect(portal.rect):
+                            print("🚪 进入 Level 2！")
+                            enter_level2(player)
+                            portal = None
+                            show_portal = False
+                            level1_complete = False
 
                 if current_level == 2:
                     level_score, transition = level2_scene.update(player)
@@ -871,6 +1112,11 @@ def main():
         elif game_state == "SHAKE":
             if comet:
                 draw_shake_effect(screen, background, comet, shake_frames)
+
+        elif game_state == "FLOWER":
+            screen.blit(background, (0, 0))
+            pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
+            draw_flower_grow_animation(screen, flower_timer)
         
         elif game_state == "PLAYING":
             screen.blit(background, (0, 0))
@@ -960,6 +1206,22 @@ def main():
                             if enemy.hp <= 0:
                                 enemy.kill()
                                 print("💀 敌人被击败！")
+
+                if current_level == 1 and show_portal and portal:
+                    screen.blit(portal.image, portal.rect)
+                    try:
+                        font = pygame.font.Font(None, 30)
+                    except:
+                        font = pygame.font.SysFont("Arial", 30)
+                    alpha = 128 + int(127 * abs(math.sin(pygame.time.get_ticks() / 400)))
+                    portal_text = font.render("🚪 Press K to complete Level 1", True, (200, 150, 255))
+                    portal_text.set_alpha(alpha)
+                    text_rect = portal_text.get_rect(center=(portal.rect.centerx, portal.rect.top - 30))
+                    screen.blit(portal_text, text_rect)
+
+                # 显示 Level 1 完成提示
+                if current_level == 1 and level1_complete:
+                    draw_level_complete_text(screen)                
 
                 draw_ui(screen, player, score)
                 
