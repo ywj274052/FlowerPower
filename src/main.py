@@ -6,7 +6,7 @@ import os
 from settings import *
 from player import Player, SeedShot
 from enemy import Level2Scene
-from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar
+from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar, HitEffect
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -626,13 +626,16 @@ def main():
     current_level = 1  # [新增] 游戏默认从第一关开始
     level2_scene = Level2Scene()
 
-    # [新增] Member 3: 实例化毒气
+    # Member 3: 实例化毒气
     enemies = pygame.sprite.Group()
 
-    # [新增] 初始化毒气系统
+    # Member 3: 初始化打击特效精灵组
+    hit_effects = pygame.sprite.Group()
+
+    # Member 3: 初始化毒气系统
     poison_gas = PoisonGasSystem(1280, 720)
 
-    # [新增] Member 3: 初始化 Boss 相关的 UI 和警告特效
+    # Member 3: 初始化 Boss 相关的 UI 和警告特效
     boss_warning = BossWarningEffect(SCREEN_WIDTH, SCREEN_HEIGHT) # 如果没定义 SCREEN_WIDTH，直接写 1280, 720
     boss_ui = BossHealthBar()
     active_boss = None
@@ -765,11 +768,9 @@ def main():
                     keys = pygame.key.get_pressed()
                     if keys[pygame.K_RIGHT] and not camera_locked:
                         bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
-                        level_progress += 3  # 【新增这一行】记录累计行走距离
+                        level_progress += 3  # 记录累计行走距离
 
-                   # ==========================================
                 # 【全新波次管理器】走 -> 锁屏打怪 -> 解锁 -> 走
-                # ==========================================
                 if current_level == 3:
                     VISUAL_GROUND = GROUND_Y - 35
                 
@@ -781,7 +782,7 @@ def main():
                         if level_progress >= 800 and current_wave == 1:
                             camera_locked = True
                             print("🔒 触发警报！第 1 区域锁定！")
-                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+                            poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
@@ -793,7 +794,7 @@ def main():
                         elif level_progress >= 1600 and current_wave == 2:
                             camera_locked = True
                             print("🔒 触发警报！第 2 区域锁定！")
-                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+                            poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
@@ -835,7 +836,7 @@ def main():
                         if len(enemies) == 0:
                             camera_locked = False
 
-                            # 【新增】锁屏结束，调用毒气系统的结束方法，返还被扣掉的血量！
+                            # 锁屏结束，调用毒气系统的结束方法，返还被扣掉的血量！
                             poison_gas.end_wave(player)
 
                             current_wave += 1
@@ -876,7 +877,7 @@ def main():
             if current_level == 2:
                 level2_scene.draw(screen)
 
-            # [新增] Member 3: 绘制毒沼泽
+            # Member 3: 绘制毒沼泽
             if current_level == 3:
                 # 画第一张图
                 screen.blit(swamp_bg, (bg_x, 0))
@@ -888,6 +889,10 @@ def main():
                 for enemy in enemies:
                     if hasattr(enemy, 'draw_health_bar'):
                         enemy.draw_health_bar(screen)
+
+                # 更新并绘制所有的打击特效！ (建议放在怪物上面画，不要被怪物贴图挡住)
+                hit_effects.update()
+                hit_effects.draw(screen)
             
             if player:
                 for seed in player.seed_shots:
@@ -895,7 +900,7 @@ def main():
                 for seed in player.seed_shots:
                     screen.blit(seed.image, seed.rect)
 
-                # 【新增】远程种子(子弹)与怪物的碰撞检测
+                # 远程种子(子弹)与怪物的碰撞检测
                 for enemy in enemies:
                     # 必须用 [:] 切片来遍历，因为我们要在循环中删除击中的种子
                     for seed in player.seed_shots[:]: 
@@ -909,6 +914,15 @@ def main():
                             # 2. 怪物扣血 (假设一颗种子伤害为 10)
                             enemy.hp -= 10
                             print(f"🎯 种子精准命中！敌人剩余 HP: {enemy.hp}")
+
+                            # 检查怪物是否死亡，如果死了就加上对应的分数
+                            if enemy.hp <= 0 and not getattr(enemy, 'score_given', False):
+                                score += getattr(enemy, 'score_value', 0)
+                                enemy.score_given = True  # 标记为已加过分，防止重复触发
+                                print(f"🎯 击杀成功！获得 {enemy.score_value} 分！当前总分: {score}")
+
+                            # 在怪物身体的中心点，生成打击闪光！
+                            hit_effects.add(HitEffect(enemy.rect.centerx, enemy.rect.centery))
                     
                             # 3. 怪物死亡检测
                             if enemy.hp <= 0:
@@ -923,12 +937,12 @@ def main():
                 if player.is_attacking:
                     hitbox = player.create_attack_hitbox()
 
-                    # 【关键修复】强行把红框的高度往下延伸 40 像素，变成“扫地攻击”！
+                    # 强行把红框的高度往下延伸 40 像素，变成“扫地攻击”！
                     hitbox.height += 40
 
                     pygame.draw.rect(screen, RED, hitbox, 2)
 
-                    # 【新增】遍历当前关卡的所有敌人，检测是否被红框击中
+                    # 遍历当前关卡的所有敌人，检测是否被红框击中
                     for enemy in enemies:
                         # 使用 colliderect 检测红框和敌人的矩形是否重叠
                         if hitbox.colliderect(enemy.rect):
@@ -952,7 +966,7 @@ def main():
                 screen.blit(player.image, player.rect)
             draw_game_over_screen(screen, player)
         
-        # 【新增】更新并绘制全屏毒气特效
+        # 更新并绘制全屏毒气特效
         poison_gas.update(player)
         poison_gas.draw(screen)
 

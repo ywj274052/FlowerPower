@@ -145,6 +145,9 @@ class ToxicSludge(pygame.sprite.Sprite):
         self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
         self.show_hp_timer = 0    # 显血计时器
 
+        self.score_value = 10
+        self.score_given = False
+
     def kill(self):
         """【核心黑科技：拦截 main.py 的瞬间删除指令】"""
         # 如果还没死，说明这是 main.py 刚把它打空血的瞬间
@@ -353,6 +356,9 @@ class MothSpike(pygame.sprite.Sprite):
         self.exact_y = float(self.rect.y)
         
         self.timer = 0  
+
+        self.score_value = 20
+        self.score_given = False
 
     def draw_glowing_effect(self):
         """核心特效：每一帧在透明画布上动态绘制多层能量重叠效果"""
@@ -590,7 +596,7 @@ class PoisonToad(pygame.sprite.Sprite):
         self.ground_y = y + self.y_offset
         self.rect = self.image.get_rect(bottomleft=(x, self.ground_y))
         
-        # 【新增】精确 X 坐标，防止抛物线计算时掉帧卡顿
+        # 精确 X 坐标，防止抛物线计算时掉帧卡顿
         self.exact_x = float(self.rect.x)
 
         self.hp = 20
@@ -599,7 +605,7 @@ class PoisonToad(pygame.sprite.Sprite):
         self.jump_force = -12      # 跳跃高度
         
         self.vy = 0
-        self.vx = 0                # 【新增】跳跃时的水平移动速度
+        self.vx = 0                # 跳跃时的水平移动速度
         self.jump_timer = 0
         self.is_jumping = False
 
@@ -610,6 +616,9 @@ class PoisonToad(pygame.sprite.Sprite):
 
         self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
         self.show_hp_timer = 0    # 显血计时器
+
+        self.score_value = 30
+        self.score_given = False
 
     def kill(self):
         if not getattr(self, 'is_dead', False):
@@ -743,8 +752,7 @@ class PoisonToad(pygame.sprite.Sprite):
                             self.state = 'idle'
                             self.jump_timer += 1
                             if self.jump_timer > 90:  
-                                # ==========================================
-                                # 【全新追踪跳跃核心逻辑】
+                                
                                 # 1. 目标不是玩家的正中心，而是玩家“身前”的一点点距离，防穿模
                                 target_x = player.rect.centerx
                                 if target_x > self.rect.centerx:
@@ -999,7 +1007,7 @@ class Hecate(pygame.sprite.Sprite):
         self.attack_cooldown = 120    
         self.ult_cooldown = 0         
         
-        # 【新增】半血状态记录与自带毒气系统
+        # 半血状态记录与自带毒气系统
         self.has_screamed = False
         self.boss_gas = BossPoisonGasSystem(1280, 720) 
         
@@ -1007,6 +1015,9 @@ class Hecate(pygame.sprite.Sprite):
         self.has_fired = False
         self.is_hurt = False
         self.is_dead = False
+
+        self.score_value = 500
+        self.score_given = False
 
     def kill(self):
         if not getattr(self, 'is_dead', False):
@@ -1347,3 +1358,48 @@ class BossHealthBar:
         if current_health_width > 0:
             hp_rect = pygame.Rect(start_x, start_y, current_health_width, bar_height)
             pygame.draw.rect(screen, (220, 20, 60), hp_rect)
+
+# ==========================================
+# 战斗视觉特效：受击十字闪光 (Hit Spark)
+# ==========================================
+class HitEffect(pygame.sprite.Sprite):
+    """打击感爆棚的受击特效 (纯代码绘制，自带动画)"""
+    def __init__(self, x, y):
+        super().__init__()
+        self.size = 80  # 特效画布大小
+        self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
+        self.rect = self.image.get_rect(center=(x, y))
+        self.timer = 12  # 特效持续 12 帧 (大约 0.2 秒，短促有力)
+        self.max_timer = 12
+
+    def update(self, *args):
+        self.timer -= 1
+        if self.timer <= 0:
+            self.kill()  # 动画结束，自动销毁
+        else:
+            self.image.fill((0, 0, 0, 0))  # 清空上一帧的画布
+            
+            # 动态计算特效的扩张大小和淡出透明度
+            progress = 1 - (self.timer / self.max_timer)
+            alpha = int(255 * (self.timer / self.max_timer))
+            current_size = int(20 + 60 * progress)  # 从 20 像素猛烈向外爆开到 80 像素
+            
+            center = self.size // 2
+            offset = current_size // 2
+            
+            # 主色调：耀眼的金黄色
+            color = (255, 220, 50, alpha)
+            
+            # 1. 画横向斩击光芒
+            pygame.draw.polygon(self.image, color, [
+                (center - offset, center), (center, center - 3), 
+                (center + offset, center), (center, center + 3)
+            ])
+            # 2. 画纵向斩击光芒
+            pygame.draw.polygon(self.image, color, [
+                (center, center - offset), (center + 3, center), 
+                (center, center + offset), (center - 3, center)
+            ])
+            # 3. 中心极高亮的白点，模拟金属碰撞的核心
+            core_radius = max(1, 8 - int(7 * progress))
+            pygame.draw.circle(self.image, (255, 255, 255, alpha), (center, center), core_radius)
