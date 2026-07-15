@@ -4,7 +4,7 @@ import os
 import random
 
 # ==========================================
-# 关卡机制：全屏毒气生存系统 
+# Full-screen poison gas survival system mechanism
 # ==========================================
 class PoisonGasSystem:
     def __init__(self, screen_width=1280, screen_height=720):
@@ -18,19 +18,19 @@ class PoisonGasSystem:
         self.damage_tick_timer = 0       
         self.damage_accumulated = 0      
         
-        # --- 视觉特效升级 1：预渲染静态边缘晕影 (Vignette) ---
-        # 屏幕中间完全透明，只有边缘有渐变的暗绿色
+        # Pre-rendered static edge vignette
+        # The center of the screen is completely transparent, with only the edges showing a gradient of dark green.
         self.vignette = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         for i in range(40):
-            # 透明度从边缘向内递减
+            # Transparency decreases from the edge inwards
             alpha = 120 - i * 3
             if alpha < 0: alpha = 0
             rect = pygame.Rect(i * 4, i * 4, self.width - i * 8, self.height - i * 8)
             pygame.draw.rect(self.vignette, (40, 120, 40, alpha), rect, 4)
 
-        # --- 视觉特效升级 2：毒孢子粒子系统 ---
+        # Poison spore particle system
         self.particles = []
-        for _ in range(50): # 满屏分布 50 个小毒孢子
+        for _ in range(50): 
             self.particles.append({
                 'x': random.randint(0, self.width),
                 'y': random.randint(0, self.height),
@@ -60,7 +60,7 @@ class PoisonGasSystem:
         if not self.active:
             return
 
-        # 阶段 1：倒数 10 秒 (60帧 * 10 = 600)
+        # Phase 1: 10 seconds countdown
         if not self.gas_released:
             self.wave_timer += 1
             if self.wave_timer == 600:
@@ -69,20 +69,19 @@ class PoisonGasSystem:
                 self.damage_tick_timer = 0
                 print("☣️ 警告！全屏毒气开始释放，持续 10 秒！")
                 
-        # 阶段 2：毒气喷发期间 (持续 10 秒)
+        # Phase 2: During the gas eruption 
         else:
             self.gas_duration_timer += 1
             if self.gas_duration_timer <= 600:
-                # --- 更新粒子物理运动 ---
                 for p in self.particles:
-                    p['y'] -= p['speed'] # 向上飘
-                    p['x'] += math.sin(p['y'] * 0.05) * 1.5 # 左右摇摆
-                    # 飞出屏幕顶部后，从底部重新生成
+                    p['y'] -= p['speed'] # Float upwards
+                    p['x'] += math.sin(p['y'] * 0.05) * 1.5 # Swaying left and right
+                    # After flying off the top of the screen, it regenerates from the bottom
                     if p['y'] < -10:
                         p['y'] = self.height + 10
                         p['x'] = random.randint(0, self.width)
                         
-                # --- 扣血逻辑 ---
+                # Blood Deduction Logic
                 self.damage_tick_timer += 1
                 if self.damage_tick_timer >= 60: 
                     self.damage_tick_timer = 0
@@ -97,14 +96,12 @@ class PoisonGasSystem:
                 pass 
 
     def draw(self, screen):
-        """渲染护眼版毒气特效"""
         if self.gas_released and self.gas_duration_timer <= 600:
-            # 1. 绘制静态边缘绿光 (绝不闪烁，中间清晰)
+            # 1. Draw a static edge green light
             screen.blit(self.vignette, (0, 0))
             
-            # 2. 绘制漂浮的毒孢子
+            # 2. Drawing floating poison spores
             for p in self.particles:
-                # 画一个带点透明度的绿色小圆点
                 pygame.draw.circle(screen, (100, 255, 100, 180), (int(p['x']), int(p['y'])), p['size'])
 
 # ==========================================
@@ -813,7 +810,7 @@ class PoisonToad(pygame.sprite.Sprite):
 # ==========================================
 
 class BossSpike(pygame.sprite.Sprite):
-    """Boss 技能 1: 深粉红散弹毒刺 (已修复空气墙伤害)"""
+    # BOSS Skill 1
     def __init__(self, x, y, angle_offset, target_x, target_y):
         super().__init__()
         self.size = 32
@@ -844,9 +841,6 @@ class BossSpike(pygame.sprite.Sprite):
         self.rect.x = int(self.exact_x)
         self.rect.y = int(self.exact_y)
         
-        # 【核心修复：缩小判定框】
-        # inflate(-16, -16) 意味着将物理判定框的宽高各缩小 16 像素。
-        # 这样毒刺的边缘光晕就不会造成伤害，必须是“实体刺中”才会扣血！
         hitbox = self.rect.inflate(-16, -16)
         
         if player and hitbox.colliderect(player.rect):
@@ -857,7 +851,7 @@ class BossSpike(pygame.sprite.Sprite):
             self.kill()
 
 class TrackingSpike(pygame.sprite.Sprite):
-    """Boss 技能 3: 深粉红追踪巨型毒刺 (加入超时惩罚机制)"""
+    # BOSS Skill 3
     def __init__(self, position_type, shared_state, player):
         super().__init__()
         self.size = 70  
@@ -890,23 +884,22 @@ class TrackingSpike(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=self.rect.center)
 
     def kill(self):
-        """记录解除原因：如果是被打爆的，标记为 'broken'"""
         if self.shared_state.get('tracking', True):
-            print("💥 漂亮！玩家打碎了巨刺阵眼！追踪立即停止！")
+            print("玩家打碎了巨刺阵眼！追踪立即停止！")
             self.shared_state['tracking'] = False
-            self.shared_state['reason'] = 'broken'  # 【新增】告诉其他毒刺：我是被打碎的！
+            self.shared_state['reason'] = 'broken'
         super().kill()
 
     def update(self, player_ignored):
         hitbox = self.rect.inflate(-30, -30)
         
         if self.shared_state.get('tracking', True):
-            # --- 阶段 1：死死跟随，并开启 2 秒倒计时 ---
+            # Phase 1: Follow closely and start a 2-second countdown.
             self.track_timer += 1
             if self.track_timer >= 120: 
-                print("⚠️ 2秒追踪时间到! 惩罚机制触发！大毒刺将直接锁定玩家！")
+                print("2秒追踪时间到! 惩罚机制触发！大毒刺将直接锁定玩家！")
                 self.shared_state['tracking'] = False 
-                self.shared_state['reason'] = 'timeout' # 【新增】告诉其他毒刺：时间到了！
+                self.shared_state['reason'] = 'timeout'
                 
             offset = 120
             if self.position_type == 'top': target = (self.player.rect.centerx, self.player.rect.centery - offset)
@@ -917,7 +910,7 @@ class TrackingSpike(pygame.sprite.Sprite):
             self.rect.center = target
             self.exact_x, self.exact_y = self.rect.x, self.rect.y
             
-            # 矛头对准玩家
+            # The spearhead is aimed at the player
             angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
             self.draw_crystal(math.degrees(angle))
             
@@ -925,21 +918,21 @@ class TrackingSpike(pygame.sprite.Sprite):
                 self.player.take_damage(10)
                 self.kill()
         else:
-            # --- 阶段 2：根据解除原因，决定后续行为 ---
+            # Phase 2: Determine subsequent actions based on the reason for termination.
             self.lock_timer += 1
             
-            # 情况 A：因为超时而解除 (惩罚机制：立刻朝玩家射击)
+            # Scenario A: Released due to timeout
             if self.shared_state.get('reason') == 'timeout':
                 if self.lock_timer == 1:
-                    # 瞬间锁定玩家当前位置并发射，不给喘息时间！
+                    # Instantly lock onto the player's current location and launch.
                     angle = math.atan2(self.player.rect.centery - self.rect.centery, self.player.rect.centerx - self.rect.centerx)
-                    speed = 18  # 弹道极快
+                    speed = 18  
                     self.vx = math.cos(angle) * speed
                     self.vy = math.sin(angle) * speed
                     self.draw_crystal(math.degrees(angle))
                     self.fired = True
 
-            # 情况 B：因为玩家打碎了其中一根而解除 (奖励机制：停顿2秒，十字乱射)
+            # Situation B: The issue is resolved because the player broke one of the pillars.
             elif self.shared_state.get('reason') == 'broken':
                 if self.lock_timer == 1:
                     if self.position_type == 'top': self.draw_crystal(-90)
@@ -955,7 +948,7 @@ class TrackingSpike(pygame.sprite.Sprite):
                     elif self.position_type == 'right': self.vx, self.vy = speed, 0
                     self.fired = True
                 
-            # 执行发射后的移动逻辑
+            # Execute post-launch movement logic
             if self.fired:
                 self.exact_x += self.vx
                 self.exact_y += self.vy
@@ -964,7 +957,7 @@ class TrackingSpike(pygame.sprite.Sprite):
                 
                 if hitbox.colliderect(self.player.rect):
                     self.player.take_damage(15)
-                    print("📌 玩家被 Boss 巨型毒刺命中！")
+                    print("玩家被 Boss 巨型毒刺命中！")
                     self.kill()
                     
                 if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
@@ -985,7 +978,7 @@ class Hecate(pygame.sprite.Sprite):
         self.animations = {
             'idle': [], 'walk': [], 'run': [], 
             'attack1': [], 'attack2': [], 'attack3': [], 
-            'scream': [], # 【新增】尖叫状态
+            'scream': [], 
             'hurt': [], 'dead': []
         }
         self.frame_index = 0           
@@ -1039,7 +1032,7 @@ class Hecate(pygame.sprite.Sprite):
             'attack1': {'file': 'Attack_4.png', 'frames': 7}, 
             'attack2': {'file': 'Attack_2.png', 'frames': 4}, 
             'attack3': {'file': 'Attack_3.png', 'frames': 7}, 
-            'scream':  {'file': 'Scream.png', 'frames': 4}, # 【新增】加载 4 帧的尖叫动画
+            'scream':  {'file': 'Scream.png', 'frames': 4}, 
             'hurt':    {'file': 'Hurt.png', 'frames': 3},
             'dead':    {'file': 'Dead.png', 'frames': 4}
         }
@@ -1081,7 +1074,6 @@ class Hecate(pygame.sprite.Sprite):
             if self.is_hurt:
                 self.is_hurt = False
             
-            # 【包含 scream】技能或尖叫结束后，恢复待机
             if self.state in ['attack1', 'attack2', 'attack3', 'run', 'scream']:
                 self.current_action_done = True
                 self.attack_cooldown = 90  
@@ -1103,14 +1095,14 @@ class Hecate(pygame.sprite.Sprite):
         if self.ult_cooldown > 0:
             self.ult_cooldown -= 1
 
-        # 【半血转阶段机制】如果血量首次 <= 50%，强制打断当前所有动作进入尖叫状态！
+        # Half-health transition mechanism
         if self.hp <= self.max_hp * 0.5 and not self.has_screamed and not self.is_dead:
             self.has_screamed = True
             self.state = 'scream'
             self.frame_index = 0
             self.current_action_done = False
             self.has_fired = False
-            self.is_hurt = False  # 清除受击僵直，展现霸体
+            self.is_hurt = False  # Clears hit recovery stun and grants super armor.
 
         if self.hp < self.last_hp:
             if self.hp <= 0:
@@ -1130,14 +1122,14 @@ class Hecate(pygame.sprite.Sprite):
                 if self.state not in ['attack1', 'attack2', 'attack3', 'run', 'scream']:
                     self.facing_right = True if self.rect.centerx < player.rect.centerx else False
                 
-                # --- 【半血技能：尖叫毒气爆发】 ---
+                # Half-health skill
                 if self.state == 'scream':
-                    # 当尖叫动画播放到第 2 帧 (也就是开始张嘴的那一刻) 释放毒气
+                    # When the screaming animation plays to frame 2, poison gas is released.
                     if int(self.frame_index) == 2 and not self.has_fired:
                         self.boss_gas.trigger()
                         self.has_fired = True
 
-                # --- 正常 AI 决策 (非尖叫状态下) ---
+                # AI decision-making
                 else:
                     if self.current_action_done and self.attack_cooldown <= 0:
                         self.current_action_done = False
@@ -1145,15 +1137,15 @@ class Hecate(pygame.sprite.Sprite):
                         self.frame_index = 0
                         
                         if self.ult_cooldown <= 0 and random.random() < 0.20:
-                            print("💀 Boss 释放大招：追踪巨型毒刺！")
+                            print("Boss 释放大招：追踪巨型毒刺！")
                             self.state = 'attack3'
                             self.ult_cooldown = 600  
                         else:
                             if random.random() < 0.50:
-                                print("💀 Boss 释放技能 1: 深粉红散弹！")
+                                print("Boss 释放技能 1: 深粉红散弹！")
                                 self.state = 'attack1'
                             else:
-                                print("💀 Boss 释放技能 2: 致命冲锋！")
+                                print("Boss 释放技能 2: 致命冲锋！")
                                 self.state = 'run'
                             
                     elif self.current_action_done:
@@ -1198,39 +1190,34 @@ class Hecate(pygame.sprite.Sprite):
 # ==========================================
 
 class BossWarningEffect:
-    """锁屏时的屏幕两侧红色渐变警告特效 (呼吸灯闪烁)"""
     def __init__(self, screen_width=1280, screen_height=720):
         self.width = screen_width
         self.height = screen_height
         self.active = False
         self.timer = 0
         
-        # 预先绘制带有透明通道的红色渐变条纹画布
+        # Pre-draw a red gradient striped canvas with alpha channels.
         self.surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        stripe_width = 150  # 渐变条纹的宽度
+        stripe_width = 150 
         
         for x in range(stripe_width):
-            # 越靠近边缘越红，越往屏幕中间越透明
+            # The closer to the edge, the redder it is; the closer to the center of the screen, the more transparent it becomes.
             alpha = int(255 * (1 - (x / stripe_width)))
-            # 左侧红边
             pygame.draw.line(self.surface, (200, 0, 0, alpha), (x, 0), (x, self.height))
-            # 右侧红边
             pygame.draw.line(self.surface, (200, 0, 0, alpha), (self.width - 1 - x, 0), (self.width - 1 - x, self.height))
 
     def trigger(self):
-        """触发警告特效，持续 3 秒 (180帧)"""
         self.active = True
         self.timer = 180
-        print("🚨 Boss 警告特效已触发！")
+        print("Boss 警告特效已触发！")
 
     def draw(self, screen):
-        """每帧调用，渲染呼吸闪烁效果"""
         if self.active and self.timer > 0:
             self.timer -= 1
-            # 使用正弦波函数计算呼吸闪烁的透明度 (忽明忽暗)
+            # Calculate the transparency of the breathing flicker using a sine wave function.
             pulse_alpha = int(abs(math.sin(self.timer * 0.1)) * 150 + 50)
             
-            # 复制一份画布来应用透明度，防止修改原画
+            # Duplicate the canvas and apply transparency to prevent alteration of the original artwork.
             temp_surface = self.surface.copy()
             temp_surface.set_alpha(pulse_alpha)
             screen.blit(temp_surface, (0, 0))
@@ -1248,16 +1235,15 @@ class BossPoisonGasSystem:
         self.timer = 0
         self.damage_tick = 0
         
-        # 深粉色边缘晕影 (Vignette)
+        # Deep pink edge shading
         self.vignette = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         for i in range(40):
             alpha = 120 - i * 3
             if alpha < 0: alpha = 0
             rect = pygame.Rect(i * 4, i * 4, self.width - i * 8, self.height - i * 8)
-            # 深粉红色滤镜 (180, 20, 100)
             pygame.draw.rect(self.vignette, (180, 20, 100, alpha), rect, 4)
 
-        # 深粉色毒孢子
+        # Deep pink poison spores
         self.particles = []
         for _ in range(50): 
             self.particles.append({
@@ -1269,16 +1255,16 @@ class BossPoisonGasSystem:
 
     def trigger(self):
         self.active = True
-        self.timer = 600  # 10 秒 (60帧/秒 * 10)
+        self.timer = 600 
         self.damage_tick = 0
-        print("😱 HECATE 发出尖叫！全屏深粉色毒气爆发！")
+        print("HECATE 发出尖叫！全屏深粉色毒气爆发！")
 
     def update(self, player):
         if not self.active: return
         
         self.timer -= 1
         if self.timer > 0:
-            # 粒子运动
+            # Particle motion
             for p in self.particles:
                 p['y'] -= p['speed'] 
                 p['x'] += math.sin(p['y'] * 0.05) * 1.5 
@@ -1286,26 +1272,25 @@ class BossPoisonGasSystem:
                     p['y'] = self.height + 10
                     p['x'] = random.randint(0, self.width)
                     
-            # 每秒钟扣血一次
+            # Blood deduction once every second
             self.damage_tick += 1
             if self.damage_tick >= 60: 
                 self.damage_tick = 0
                 
-                # 【核心：锁血不死机制】
+                # Invincibility Mechanism
                 if player.hp > 1:
                     player.hp -= 4
-                    # 如果扣完血发现死掉了，强行锁在 1 滴血！
+                    # Forcibly locked at 1 drop of blood
                     if player.hp < 1:
                         player.hp = 1
                         
-                    print(f"🩸 Boss毒气侵!失去生命，当前强制剩余 {player.hp}!")
+                    print(f"Boss毒气侵!失去生命，当前强制剩余 {player.hp}!")
                     player.is_hurt = True
                     if hasattr(player, 'hurt_timer'): player.hurt_timer = 30
         else:
             self.active = False
 
     def draw(self, screen):
-        """渲染全屏深粉色毒气特效"""
         if self.active and self.timer > 0:
             screen.blit(self.vignette, (0, 0))
             for p in self.particles:
@@ -1363,44 +1348,42 @@ class BossHealthBar:
 # 战斗视觉特效：受击十字闪光 (Hit Spark)
 # ==========================================
 class HitEffect(pygame.sprite.Sprite):
-    """打击感爆棚的受击特效 (纯代码绘制，自带动画)"""
     def __init__(self, x, y):
         super().__init__()
-        self.size = 80  # 特效画布大小
+        self.size = 80  # Special effects canvas size
         self.image = pygame.Surface((self.size, self.size), pygame.SRCALPHA).convert_alpha()
         self.rect = self.image.get_rect(center=(x, y))
-        self.timer = 12  # 特效持续 12 帧 (大约 0.2 秒，短促有力)
+        self.timer = 12
         self.max_timer = 12
 
     def update(self, *args):
         self.timer -= 1
         if self.timer <= 0:
-            self.kill()  # 动画结束，自动销毁
+            self.kill()  # Automatically destroys after animation ends.
         else:
-            self.image.fill((0, 0, 0, 0))  # 清空上一帧的画布
+            self.image.fill((0, 0, 0, 0))  # Clear the canvas of the previous frame
             
-            # 动态计算特效的扩张大小和淡出透明度
+            # Dynamically calculate the expansion size and fade-out transparency of special effects.
             progress = 1 - (self.timer / self.max_timer)
             alpha = int(255 * (self.timer / self.max_timer))
-            current_size = int(20 + 60 * progress)  # 从 20 像素猛烈向外爆开到 80 像素
+            current_size = int(20 + 60 * progress) 
             
             center = self.size // 2
             offset = current_size // 2
             
-            # 主色调：耀眼的金黄色
             color = (255, 220, 50, alpha)
             
-            # 1. 画横向斩击光芒
+            # 1. Draw a horizontal slash of light
             pygame.draw.polygon(self.image, color, [
                 (center - offset, center), (center, center - 3), 
                 (center + offset, center), (center, center + 3)
             ])
-            # 2. 画纵向斩击光芒
+            # 2. Draw a vertical slash of light
             pygame.draw.polygon(self.image, color, [
                 (center, center - offset), (center + 3, center), 
                 (center, center + offset), (center - 3, center)
             ])
-            # 3. 中心极高亮的白点，模拟金属碰撞的核心
+            # 3. The white dot with extremely high brightness in the center
             core_radius = max(1, 8 - int(7 * progress))
             pygame.draw.circle(self.image, (255, 255, 255, alpha), (center, center), core_radius)
 
@@ -1408,48 +1391,43 @@ class HitEffect(pygame.sprite.Sprite):
 # 关卡开场文字横幅 (渐变特效)
 # ==========================================
 class LevelBanner:
-    """关卡开场大字提示：渐变出现 -> 保持 -> 渐变消失"""
     def __init__(self, text="Level 3", screen_width=1280):
-        # 使用安全的内置默认字体，字号设为 80（足够大且醒目）
         self.font = pygame.font.Font(None, 80)
         self.text = text
         self.screen_width = screen_width
         
-        # 1. 预先渲染好文字表面 (使用亮眼且带有一点史诗感的金色)
         self.text_surf = self.font.render(self.text, True, (255, 215, 0))
         
-        # 2. 计算居中位置：屏幕上方正中间 (Y 轴设在 80 像素处)
+        # The center position is calculated to be exactly in the top center of the screen.
         self.rect = self.text_surf.get_rect(center=(self.screen_width // 2, 80))
         
-        # 3. 核心控制变量
-        self.alpha = 0              # 初始透明度为 0 (完全透明)
-        self.state = 'fade_in'      # 初始状态：渐入
-        self.hold_timer = 0         # 保持状态的计时器
+        # Core control variables
+        self.alpha = 0            
+        self.state = 'fade_in'     
+        self.hold_timer = 0        
 
     def update(self):
-        """每帧调用，更新透明度和动画状态机"""
         if self.state == 'fade_in':
-            self.alpha += 5         # 每帧增加 5 点透明度
+            self.alpha += 5         # Increase transparency by 5 points per frame.
             if self.alpha >= 255:
                 self.alpha = 255
-                self.state = 'hold'  # 达到全显，切换到保持状态
+                self.state = 'hold'  # To achieve full display, switch to hold mode.
                 self.hold_timer = 0
                 
         elif self.state == 'hold':
             self.hold_timer += 1
-            if self.hold_timer >= 90: # 在屏幕上保持 1.5 秒 (60帧/秒 * 1.5 = 90帧)
+            if self.hold_timer >= 90: 
                 self.state = 'fade_out'
                 
         elif self.state == 'fade_out':
-            self.alpha -= 5         # 每帧减少 5 点透明度
+            self.alpha -= 5         # Reduce transparency by 5 points per frame.
             if self.alpha <= 0:
                 self.alpha = 0
-                self.state = 'done'  # 动画完全结束
+                self.state = 'done'  # The animation has completely ended.
 
     def draw(self, screen):
-        """如果动画没结束，就将其画到屏幕上"""
         if self.state != 'done':
-            # 【核心原理】：必须复制一份文字画布再应用透明度，否则会污染原画布
+            # You must duplicate the text canvas before applying transparency; otherwise, it will taint the original canvas.
             temp_surf = self.text_surf.copy()
             temp_surf.set_alpha(self.alpha)
             screen.blit(temp_surf, self.rect)
