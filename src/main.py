@@ -887,7 +887,7 @@ def main():
                 # 画第二张图，紧紧贴在第一张图的右边
                 screen.blit(swamp_bg, (bg_x + 1280, 0))
 
-                # 【核心新增】：更新并绘制 Level 3 开场大字
+                # 更新并绘制 Level 3 开场大字
                 level_banner.update()
                 level_banner.draw(screen)
                 
