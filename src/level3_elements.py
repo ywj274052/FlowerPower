@@ -343,9 +343,6 @@ class MothSpike(pygame.sprite.Sprite):
         
         self.timer = 0  
 
-        self.score_value = 20
-        self.score_given = False
-
     def draw_glowing_effect(self):
         self.image.fill((0, 0, 0, 0))
         self.timer += 0.4
@@ -404,6 +401,9 @@ class SwampMoth(pygame.sprite.Sprite):
 
         self.max_hp = self.hp     # 记录最大血量，用于计算血条比例
         self.show_hp_timer = 0    # 显血计时器
+
+        self.score_value = 20
+        self.score_given = False
 
     def kill(self):
         if not getattr(self, 'is_dead', False):
