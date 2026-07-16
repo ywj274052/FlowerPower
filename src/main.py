@@ -1143,7 +1143,7 @@ def main():
                     if hasattr(enemy, 'draw_health_bar'):
                         enemy.draw_health_bar(screen)
 
-                # 更新并绘制所有的打击特效！ (建议放在怪物上面画，不要被怪物贴图挡住)
+                # 更新并绘制所有的打击特效！
                 hit_effects.update()
                 hit_effects.draw(screen)
             
@@ -1160,19 +1160,19 @@ def main():
                         # 检测种子的矩形框是否碰到了怪物的矩形框
                         if seed.rect.colliderect(enemy.rect):
                     
-                            # 1. 种子击中后要销毁（从列表里删掉，防止穿透打一串）
+                            # 1. 种子击中后要销毁
                             if seed in player.seed_shots:
                                 player.seed_shots.remove(seed)
                     
-                            # 2. 怪物扣血 (假设一颗种子伤害为 10)
+                            # 2. 怪物扣血
                             enemy.hp -= 10
-                            print(f"🎯 种子精准命中！敌人剩余 HP: {enemy.hp}")
+                            print(f"种子精准命中！敌人剩余 HP: {enemy.hp}")
 
                             # 检查怪物是否死亡，如果死了就加上对应的分数
                             if enemy.hp <= 0 and not getattr(enemy, 'score_given', False):
                                 score += getattr(enemy, 'score_value', 0)
                                 enemy.score_given = True  # 标记为已加过分，防止重复触发
-                                print(f"🎯 击杀成功！获得 {enemy.score_value} 分！当前总分: {score}")
+                                print(f"击杀成功！获得 {enemy.score_value} 分！当前总分: {score}")
 
                             # 在怪物身体的中心点，生成打击闪光！
                             hit_effects.add(HitEffect(enemy.rect.centerx, enemy.rect.centery))
@@ -1205,7 +1205,7 @@ def main():
                             # 如果敌人血量归零，将其从怪物组中移除
                             if enemy.hp <= 0:
                                 enemy.kill()
-                                print("💀 敌人被击败！")
+                                print("敌人被击败！")
 
                 if current_level == 1 and show_portal and portal:
                     screen.blit(portal.image, portal.rect)

@@ -123,8 +123,6 @@ class ToxicSludge(pygame.sprite.Sprite):
         
         self.image = self.animations[self.state][self.frame_index]
         
-        # 【视觉修复 1：解决悬空问题】
-        # 图片下方有大量透明留白，我们需要把它的物理碰撞框强行往下平移 (补偿视觉差)
         self.y_offset = 15  # 如果他还是悬空，把数字加大；如果陷进土里了，把数字减小！
         self.rect = self.image.get_rect(bottomleft=(x, y + self.y_offset))
 
@@ -146,8 +144,6 @@ class ToxicSludge(pygame.sprite.Sprite):
         self.score_given = False
 
     def kill(self):
-        """【核心黑科技：拦截 main.py 的瞬间删除指令】"""
-        # 如果还没死，说明这是 main.py 刚把它打空血的瞬间
         if not getattr(self, 'is_dead', False):
             self.hp = 0
             self.is_dead = True
@@ -155,20 +151,17 @@ class ToxicSludge(pygame.sprite.Sprite):
             self.frame_index = 0
             
             # 极其巧妙的一步：把物理碰撞框长宽设为 0！
-            # 这样既能让尸体继续画在原地，又不会变成挡住子弹的“肉盾”（子弹会直接穿透尸体）
+            # 这样既能让尸体继续画在原地，又不会变成挡住子弹的“肉盾”
             self.rect.width = 0
             self.rect.height = 0
             
             return # 强行 return，拦截指令，不执行真实的删除操作！
 
-        # 只有当死亡动画播完，并且躺够了 120 帧 (2秒) 时，才真正从内存中抹除
         if hasattr(self, 'dead_timer') and self.dead_timer >= 120:
             super().kill()
 
     def load_animations(self, base_path):
-        """处理单独的 PNG 序列图"""
         
-        # 配置每个动作对应的【文件名】和【总帧数】
         animation_config = {
             'idle':   {'file': 'Idle.png', 'frames': 5},
             'walk':   {'file': 'Walk.png', 'frames': 7},
@@ -177,7 +170,7 @@ class ToxicSludge(pygame.sprite.Sprite):
             'dead':   {'file': 'Dead.png', 'frames': 4}
         }
 
-        scale = 1.3 # 放大倍数
+        scale = 1.3 
         
         for state, info in animation_config.items():
             path = os.path.join(base_path, info['file'])
@@ -194,7 +187,7 @@ class ToxicSludge(pygame.sprite.Sprite):
                     img = pygame.transform.scale(img, (int(frame_width * scale), int(frame_height * scale)))
                     self.animations[state].append(img)
             else:
-                print(f"⚠️ 找不到图片 {path}，使用默认红色方块代替")
+                print(f"找不到图片 {path}，使用默认红色方块代替")
                 frame_width, frame_height = 100, 100
                 for i in range(info['frames']):
                     img = pygame.Surface((int(frame_width * scale), int(frame_height * scale)))
@@ -264,7 +257,6 @@ class ToxicSludge(pygame.sprite.Sprite):
 
         # 2. AI 行为逻辑
         if not self.is_dead and not self.is_hurt:
-            # 【逻辑修复 2：状态锁定】一旦开始攻击，无视其他所有指令，直到动画自然播放完毕！
             if self.state == 'attack':
                 pass 
             # 攻击处于冷却状态
@@ -273,7 +265,6 @@ class ToxicSludge(pygame.sprite.Sprite):
                 if self.state != 'idle':
                     self.state = 'idle'
                     self.frame_index = 0
-            # 正常思考状态
             else:
                 if player:
                     if self.rect.centerx < player.rect.centerx:
@@ -284,7 +275,6 @@ class ToxicSludge(pygame.sprite.Sprite):
                     distance = abs(self.rect.centerx - player.rect.centerx)
                     
                     if distance <= 80: 
-                        # 【逻辑修复 3：重置帧】切入攻击时，强制从第 0 帧开始！
                         self.state = 'attack'
                         self.frame_index = 0
                         self.has_dealt_damage = False
@@ -299,11 +289,10 @@ class ToxicSludge(pygame.sprite.Sprite):
                             self.rect.x -= self.speed
 
         # 3. 动画驱动伤害
-        # 当动画播放到挥刀那一帧 (第 3 帧) 造成伤害
         if self.state == 'attack' and int(self.frame_index) == 3 and not self.has_dealt_damage:
             if player and self.rect.colliderect(player.rect):
                 player.take_damage(self.attack_damage)
-                print(f"🪓 兽人重砍！造成 {self.attack_damage} 点伤害！")
+                print(f"兽人重砍！造成 {self.attack_damage} 点伤害！")
             self.has_dealt_damage = True
 
     def draw_health_bar(self, screen):
@@ -314,11 +303,11 @@ class ToxicSludge(pygame.sprite.Sprite):
             
             bar_width = 40
             bar_height = 6
-            # 算出头顶的正中位置 (往上偏移 15 像素)
+            # 算出头顶的正中位置
             x = self.rect.centerx - bar_width // 2
             y = self.rect.top - 15
             
-            # 计算当前血量百分比 (加 max 防止变负数)
+            # 计算当前血量百分比 
             health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
             
             # 画黑灰色底框
@@ -331,7 +320,7 @@ class ToxicSludge(pygame.sprite.Sprite):
         self.update_animation()
 
 # ----------------------------------------------------
-# 怪物 2：蓝火法师 (代码类名保留为 SwampMoth 防止 main.py 报错)
+# 怪物 2：蓝火法师
 # ----------------------------------------------------
 class MothSpike(pygame.sprite.Sprite):
     """法师发射的炫酷幽蓝魔法球 (修复了外太空逃逸Bug)"""
@@ -348,7 +337,7 @@ class MothSpike(pygame.sprite.Sprite):
         self.vx = math.cos(angle) * speed
         self.vy = math.sin(angle) * speed
         
-        # 【新增】使用浮点数精确记录坐标，防止 Pygame 整数截断导致弹道变形
+        #使用浮点数精确记录坐标，防止 Pygame 整数截断导致弹道变形
         self.exact_x = float(self.rect.x)
         self.exact_y = float(self.rect.y)
         
@@ -358,7 +347,6 @@ class MothSpike(pygame.sprite.Sprite):
         self.score_given = False
 
     def draw_glowing_effect(self):
-        """核心特效：每一帧在透明画布上动态绘制多层能量重叠效果"""
         self.image.fill((0, 0, 0, 0))
         self.timer += 0.4
         pulse = math.sin(self.timer) * 3 
@@ -375,7 +363,7 @@ class MothSpike(pygame.sprite.Sprite):
     def update(self, player):
         self.draw_glowing_effect()
         
-        # 【修复】使用精确的浮点数累加，然后再赋值给 rect，让子弹指哪打哪
+        #使用精确的浮点数累加，然后再赋值给 rect，让子弹指哪打哪
         self.exact_x += self.vx
         self.exact_y += self.vy
         self.rect.x = int(self.exact_x)
@@ -383,10 +371,9 @@ class MothSpike(pygame.sprite.Sprite):
         
         if player and self.rect.colliderect(player.rect):
             player.take_damage(5) 
-            print("📌 玩家被幽蓝法球击中，扣除 5 点 HP！")
+            print("玩家被幽蓝法球击中，扣除 5 点 HP!")
             self.kill() 
             
-        # 【核心修复】加上了 self.rect.y < -500，封死上方的天空边界！
         if self.rect.y > 1000 or self.rect.y < -500 or self.rect.x < -1000 or self.rect.x > 3000:
             self.kill()
 
@@ -400,7 +387,6 @@ class SwampMoth(pygame.sprite.Sprite):
         self.frame_index = 0           
         self.animation_speed = 0.2     
         
-        # 【关键】请确保图片命名为 mage_sheet.png 放在这个路径下
         self.load_animations(path="assets/sprites/enemies/mage_sheet.png")
         
         self.image = self.animations[self.state][self.frame_index]
@@ -420,7 +406,6 @@ class SwampMoth(pygame.sprite.Sprite):
         self.show_hp_timer = 0    # 显血计时器
 
     def kill(self):
-        """【拦截 main.py 的瞬间删除指令】"""
         if not getattr(self, 'is_dead', False):
             self.hp = 0
             self.is_dead = True
@@ -435,25 +420,18 @@ class SwampMoth(pygame.sprite.Sprite):
             super().kill()
 
     def load_animations(self, path):
-        """读取 3行 9列 的单张精灵图"""
         if os.path.exists(path):
             sheet = pygame.image.load(path).convert_alpha()
-            # 【自动抠图】如果你保存的 PNG 带有那个浅灰色的背景，这行代码会自动把它抠成透明！
             colorkey = sheet.get_at((0, 0))
             sheet.set_colorkey(colorkey)
         else:
-            print(f"⚠️ 找不到图片 {path}，使用默认方块")
+            print(f"找不到图片 {path}，使用默认方块")
             sheet = pygame.Surface((900, 300))
             sheet.fill((150, 50, 150))
 
-        # 根据图片结构：网格最宽有 9 帧，总共有 3 行
         frame_width = sheet.get_width() // 9
         frame_height = sheet.get_height() // 3
         
-        # 你的图片结构定义：
-        # 第 0 行 (第一行)：死亡 (9帧)
-        # 第 1 行 (第二行)：攻击 (6帧)
-        # 第 2 行 (第三行)：移动 (4帧)
         animation_config = {
             'dead':   {'row': 0, 'frames': 9},
             'attack': {'row': 1, 'frames': 6},
@@ -509,10 +487,10 @@ class SwampMoth(pygame.sprite.Sprite):
             self.update_animation()
             return
         
-        # 【新增】法师的扣血检测与计时器激活
+        # 法师的扣血检测与计时器激活
         if not hasattr(self, 'last_hp'): self.last_hp = self.hp
         if self.hp < self.last_hp:
-            self.show_hp_timer = 300  # 受到伤害，重置为 300 帧 (5秒)
+            self.show_hp_timer = 300 
             self.last_hp = self.hp
             
         # 2. 扣血转死亡
@@ -528,7 +506,7 @@ class SwampMoth(pygame.sprite.Sprite):
             # 转向玩家
             self.facing_right = True if self.rect.centerx < player.rect.centerx else False
                 
-            # 保持安全距离 (大约 300 像素)
+            # 保持安全距离
             distance_x = abs(self.rect.centerx - player.rect.centerx)
             if self.state != 'attack':
                 if distance_x > 300:
@@ -541,7 +519,6 @@ class SwampMoth(pygame.sprite.Sprite):
                 self.frame_index = 0
                 self.shoot_timer = 0
                 
-            # 【动画驱动射击】当法师举起火球 (假设是第 3 帧)，才真正把子弹发射出去！
             if self.state == 'attack' and int(self.frame_index) == 3 and not self.has_shot:
                 spike = MothSpike(self.rect.centerx, self.rect.bottom, player.rect.centerx, player.rect.centery)
                 for group in self.groups():
@@ -549,18 +526,17 @@ class SwampMoth(pygame.sprite.Sprite):
                 self.has_shot = True
 
     def draw_health_bar(self, screen):
-        """绘制头顶动态血条 (受击后显示 5 秒)"""
         # 如果还没死，并且计时器大于 0，才绘制
         if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
             self.show_hp_timer -= 1  # 倒计时流逝
             
             bar_width = 40
             bar_height = 6
-            # 算出头顶的正中位置 (往上偏移 15 像素)
+            # 算出头顶的正中位置 
             x = self.rect.centerx - bar_width // 2
             y = self.rect.top - 15
             
-            # 计算当前血量百分比 (加 max 防止变负数)
+            # 计算当前血量百分比 
             health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
             
             # 画黑灰色底框
@@ -652,7 +628,7 @@ class PoisonToad(pygame.sprite.Sprite):
                     img = pygame.transform.scale(img, (int(frame_width * scale), int(frame_height * scale)))
                     self.animations[state].append(img)
             else:
-                print(f"⚠️ 找不到图片 {path}")
+                print(f"找不到图片 {path}")
                 frame_width, frame_height = 100, 100
                 for i in range(info['frames']):
                     img = pygame.Surface((int(frame_width * scale), int(frame_height * scale)))
@@ -700,7 +676,7 @@ class PoisonToad(pygame.sprite.Sprite):
             return
 
         if self.hp < self.last_hp and not self.is_dead:
-            self.show_hp_timer = 300  # 【新增】受到伤害，重置为 300 帧 (5秒)
+            self.show_hp_timer = 300  
             if self.hp <= 0:
                 self.is_dead = True
                 self.state = 'dead'
@@ -712,7 +688,7 @@ class PoisonToad(pygame.sprite.Sprite):
             self.last_hp = self.hp
 
         if not self.is_hurt:
-            # 【物理引擎升级：加入水平速度 vx 的抛物线控制】
+            # 物理引擎升级：加入水平速度 vx 的抛物线控制
             self.vy += 1.0
             self.rect.y += self.vy
             
@@ -760,12 +736,11 @@ class PoisonToad(pygame.sprite.Sprite):
                                 # 2. 计算需要跨越的总距离 dx
                                 dx = target_x - self.rect.centerx
                                 
-                                # 3. 根据重力系统反推滞空时间 (初始速度 10，重力 0.5，上下刚好各 20 帧，总计 40 帧)
+                                # 3. 根据重力系统反推滞空时间 
                                 air_time = 24
                                 
                                 # 4. 速度 = 距离 / 时间
                                 self.vx = dx / air_time
-                                # ==========================================
                                 
                                 self.vy = self.jump_force   
                                 self.is_jumping = True
@@ -778,22 +753,21 @@ class PoisonToad(pygame.sprite.Sprite):
         if self.state == 'attack' and int(self.frame_index) == 2 and not self.has_dealt_damage:
             if player and self.rect.colliderect(player.rect):
                 player.take_damage(self.attack_damage)
-                print(f"🐸 绿皮地精跳跃重击！造成 {self.attack_damage} 点伤害！")
+                print(f"绿皮地精跳跃重击！造成 {self.attack_damage} 点伤害！")
             self.has_dealt_damage = True
 
     def draw_health_bar(self, screen):
-        """绘制头顶动态血条 (受击后显示 5 秒)"""
         # 如果还没死，并且计时器大于 0，才绘制
         if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
             self.show_hp_timer -= 1  # 倒计时流逝
             
             bar_width = 40
             bar_height = 6
-            # 算出头顶的正中位置 (往上偏移 15 像素)
+            # 算出头顶的正中位置 
             x = self.rect.centerx - bar_width // 2
             y = self.rect.top - 15
             
-            # 计算当前血量百分比 (加 max 防止变负数)
+            # 计算当前血量百分比
             health_ratio = max(0, self.hp / getattr(self, 'max_hp', 1))
             
             # 画黑灰色底框
@@ -1310,8 +1284,6 @@ class BossHealthBar:
         if not boss or boss.is_dead:
             return
             
-        # 【神级黑科技】：在画血条之前，利用已有的机制渲染全屏深粉色毒气！
-        # 这样毒气既能覆盖全屏，又不会遮挡住 Boss 自己的高贵血条。
         if hasattr(boss, 'boss_gas'):
             boss.boss_gas.draw(screen)
             
