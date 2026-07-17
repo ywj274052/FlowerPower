@@ -1014,7 +1014,6 @@ def main():
                         bg_x -= 3  # 这里的 3 是背景滚动的速度，可以调节
                         level_progress += 3  # 记录累计行走距离
 
-                # 【全新波次管理器】走 -> 锁屏打怪 -> 解锁 -> 走
                 if current_level == 3:
                     VISUAL_GROUND = GROUND_Y - 35
                 
@@ -1025,7 +1024,7 @@ def main():
                     if not camera_locked:
                         if level_progress >= 800 and current_wave == 1:
                             camera_locked = True
-                            print("🔒 触发警报！第 1 区域锁定！")
+                            print("触发警报！第 1 区域锁定！")
                             poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
@@ -1037,7 +1036,7 @@ def main():
                         
                         elif level_progress >= 1600 and current_wave == 2:
                             camera_locked = True
-                            print("🔒 触发警报！第 2 区域锁定！")
+                            print("触发警报！第 2 区域锁定！")
                             poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
@@ -1049,8 +1048,8 @@ def main():
                         
                         elif level_progress >= 2400 and current_wave == 3:
                             camera_locked = True
-                            print("🔒 触发警报！第 3 区域锁定！")
-                            poison_gas.start_wave()  # 【新增】开启本波毒气 10 秒倒计时
+                            print("触发警报！第 3 区域锁定！")
+                            poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
                             enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
@@ -1064,7 +1063,7 @@ def main():
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True
-                            print("⚠️ 最终区域锁定! Boss HECATE 降临！")
+                            print("最终区域锁定! Boss HECATE 降临！")
 
                             # 1. 创建 Boss 并存入专属变量，方便血条系统随时读取它的血量
                             active_boss = Hecate(player.rect.x - 600, VISUAL_GROUND)
@@ -1085,11 +1084,11 @@ def main():
 
                             current_wave += 1
                             if current_wave > 4:
-                                print("🎉 沼泽区域完全肃清！准备进入下一关！")
+                                print("沼泽区域完全肃清！准备进入下一关！")
                             else:
-                                print("🔓 区域肃清！屏幕解锁，继续前进！")
+                                print("区域肃清！屏幕解锁，继续前进！")
                     
-                    # 关键：当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
+                    # 当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
                     if bg_x <= -1280:
                         bg_x = 0
                 
@@ -1143,7 +1142,7 @@ def main():
                     if hasattr(enemy, 'draw_health_bar'):
                         enemy.draw_health_bar(screen)
 
-                # 更新并绘制所有的打击特效！ (建议放在怪物上面画，不要被怪物贴图挡住)
+                # 更新并绘制所有的打击特效！
                 hit_effects.update()
                 hit_effects.draw(screen)
             
@@ -1153,26 +1152,29 @@ def main():
                 for seed in player.seed_shots:
                     screen.blit(seed.image, seed.rect)
 
-                # 远程种子(子弹)与怪物的碰撞检测
+                # 子弹与怪物的碰撞检测
                 for enemy in enemies:
                     # 必须用 [:] 切片来遍历，因为我们要在循环中删除击中的种子
                     for seed in player.seed_shots[:]: 
                         # 检测种子的矩形框是否碰到了怪物的矩形框
                         if seed.rect.colliderect(enemy.rect):
                     
-                            # 1. 种子击中后要销毁（从列表里删掉，防止穿透打一串）
+                            # 1. 种子击中后要销毁
                             if seed in player.seed_shots:
                                 player.seed_shots.remove(seed)
                     
-                            # 2. 怪物扣血 (假设一颗种子伤害为 10)
+                            # 2. 怪物扣血
                             enemy.hp -= 10
-                            print(f"🎯 种子精准命中！敌人剩余 HP: {enemy.hp}")
+                            print(f"种子精准命中！敌人剩余 HP: {enemy.hp}")
 
                             # 检查怪物是否死亡，如果死了就加上对应的分数
                             if enemy.hp <= 0 and not getattr(enemy, 'score_given', False):
-                                score += getattr(enemy, 'score_value', 0)
-                                enemy.score_given = True  # 标记为已加过分，防止重复触发
-                                print(f"🎯 击杀成功！获得 {enemy.score_value} 分！当前总分: {score}")
+                                earned_score = getattr(enemy, 'score_value', 0)
+                        
+                                if earned_score > 0:
+                                    score += earned_score
+                                    enemy.score_given = True
+                                    print(f"击杀成功！获得 {earned_score} 分！当前总分: {score}")
 
                             # 在怪物身体的中心点，生成打击闪光！
                             hit_effects.add(HitEffect(enemy.rect.centerx, enemy.rect.centery))
@@ -1205,7 +1207,7 @@ def main():
                             # 如果敌人血量归零，将其从怪物组中移除
                             if enemy.hp <= 0:
                                 enemy.kill()
-                                print("💀 敌人被击败！")
+                                print("敌人被击败！")
 
                 if current_level == 1 and show_portal and portal:
                     screen.blit(portal.image, portal.rect)

@@ -134,22 +134,19 @@ class Player(pygame.sprite.Sprite):
 
         self.hp -= amount
         self.last_hurt_time = current_time 
-        print(f"💥 受到 {amount} 点伤害！剩余 HP: {self.hp}")
+        print(f"受到 {amount} 点伤害！剩余 HP: {self.hp}")
 
-        # ⭐️ 触发受伤状态 (强制播放受伤动画)
+        # 触发受伤状态
         self.is_hurt = True
         self.hurt_timer = 30  
         self.hurt_frame = 0
 
-        # ==========================================
-        # 🛑 【核心修改】：受击仅强行打断回血
-        # ==========================================
+        # 受击仅强行打断回血
         if getattr(self, 'is_healing', False):
-            print("🚫 遭到攻击！回血被打断！")
+            print("遭到攻击！回血被打断！")
             self.is_healing = False
             if hasattr(self, 'heal_timer'):
                 self.heal_timer = 0  # 清空回血计时器
-        # ==========================================
 
         if self.hp <= 0:
             self.hp = 0
@@ -169,24 +166,23 @@ class Player(pygame.sprite.Sprite):
         self.hp = min(self.hp + amount, self.max_hp)
         healed = self.hp - old_hp
         if healed > 0:
-            print(f"💚 回复 {healed} HP! 当前 HP: {self.hp}")
+            print(f"回复 {healed} HP! 当前 HP: {self.hp}")
         return healed
 
     # member3 
     def draw_healing_aura(self, screen):
-        """Member 3 专属：绘制绿色呼吸治疗光环"""
         if self.is_healing:
             import math
-            # 利用正弦波让光环半径在 35~40 之间平滑呼吸
+            # Using a sine wave to smoothly adjust the halo radius between 35 and 40
             radius = 35 + int(5 * math.sin(pygame.time.get_ticks() * 0.005))
             
-            # 创建一个支持透明度的表面
+            # Create a surface that supports transparency
             aura_surface = pygame.Surface((100, 100), pygame.SRCALPHA)
             
-            # 绘制柔和黄色的圆环
+            # Draw a soft yellow ring
             pygame.draw.circle(aura_surface, (255, 255, 0, 150), (50, 50), radius, 4)
             
-            # 根据玩家当前的中心点绘制到屏幕上
+            # Draw on the screen based on the player's current center point
             screen.blit(aura_surface, (self.rect.centerx - 50, self.rect.centery - 50))
 
     def attack(self):
@@ -237,9 +233,7 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         keys = pygame.key.get_pressed()
         
-        # ==========================================
-        # ⭐ 死亡状态：播放死亡动画，不响应其他操作
-        # ==========================================
+        # 死亡状态：播放死亡动画，不响应其他操作
         if self.is_dead:
             self.update_death_animation()
             return
