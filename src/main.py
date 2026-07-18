@@ -390,6 +390,36 @@ def draw_flower(screen, x, y, color, scale=1.0):
     pygame.draw.circle(screen, (255, 246, 52), (x, y), center)
 
 
+def draw_vine_whip(screen, player):
+    effect = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    direction = 1 if player.facing_right else -1
+    progress = 1 - max(0, player.attack_timer) / max(1, ATTACK_DURATION)
+    start_x = player.rect.centerx + direction * 8
+    start_y = player.rect.centery + 12
+    reach = player.rect.width // 2 + VINE_WHIP_RANGE - 12
+    points = []
+
+    for index in range(12):
+        t = index / 11
+        x = start_x + direction * int(4 + reach * t)
+        arc = math.sin(math.pi * t) * (22 + 12 * math.sin(math.pi * progress))
+        wave = math.sin(t * math.tau + progress * math.pi) * 5
+        y = start_y - int(arc) + int(wave)
+        points.append((x, y))
+
+    pygame.draw.lines(effect, (24, 72, 37, 220), False, points, 11)
+    pygame.draw.lines(effect, (88, 222, 104, 245), False, points, 5)
+    pygame.draw.circle(effect, (190, 255, 148, 245), points[-1], 7)
+
+    for index in (5, 8):
+        x, y = points[index]
+        leaf = pygame.Rect(0, 0, 18, 9)
+        leaf.center = (x, y - 7 if index % 2 else y + 7)
+        pygame.draw.ellipse(effect, (112, 235, 106, 235), leaf)
+
+    screen.blit(effect, (0, 0))
+
+
 def draw_comet_scene(screen, comet, background):
     """绘制彗星坠落场景"""
     screen.blit(background, (0, 0))
@@ -1258,7 +1288,7 @@ def main():
                     # 强行把红框的高度往下延伸 40 像素，变成“扫地攻击”！
                     hitbox.height += 40
 
-                    pygame.draw.rect(screen, RED, hitbox, 2)
+                    draw_vine_whip(screen, player)
 
                     # 遍历当前关卡的所有敌人，检测是否被红框击中
                     for enemy in enemies:

@@ -67,6 +67,9 @@ class Player(pygame.sprite.Sprite):
         
         for key in self.animations:
             if len(self.animations[key]) == 0:
+                if key == "attack" and self.animations["idle"]:
+                    self.animations[key] = [frame.copy() for frame in self.animations["idle"]]
+                    continue
                 print(f"⚠️ {key} 动画没有图片，创建占位")
                 surf = pygame.Surface((128, 128), pygame.SRCALPHA)
                 if key == 'hurt':
