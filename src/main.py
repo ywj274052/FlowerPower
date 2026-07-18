@@ -21,9 +21,6 @@ show_tutorial = True
 TITLE_START_BUTTON = pygame.Rect(445, 504, 390, 62)
 TITLE_LEVEL2_BUTTON = pygame.Rect(425, 570, 205, 38)
 TITLE_LEVEL3_BUTTON = pygame.Rect(650, 570, 205, 38)
-MELEE_BUTTON_CENTER = (1080, 650)
-SEED_BUTTON_CENTER = (1190, 650)
-ACTION_BUTTON_RADIUS = 42
 portal = None
 show_portal = False
 level1_complete = False
@@ -391,25 +388,6 @@ def draw_flower(screen, x, y, color, scale=1.0):
     pygame.draw.circle(screen, color, (x, y + offset), petal)
     pygame.draw.circle(screen, color, (x - offset, y), petal)
     pygame.draw.circle(screen, (255, 246, 52), (x, y), center)
-
-
-def draw_action_buttons(screen):
-    for center, border in (
-        (MELEE_BUTTON_CENTER, (255, 215, 92)),
-        (SEED_BUTTON_CENTER, (98, 228, 180)),
-    ):
-        pygame.draw.circle(screen, (13, 48, 38), center, ACTION_BUTTON_RADIUS)
-        pygame.draw.circle(screen, border, center, ACTION_BUTTON_RADIUS, 3)
-
-    melee_box = pygame.Rect(0, 0, 48, 36)
-    melee_box.center = MELEE_BUTTON_CENTER
-    pygame.draw.arc(screen, (255, 235, 150), melee_box, 0.25, 3.0, 5)
-    pygame.draw.circle(screen, (255, 235, 150), (1098, 639), 5)
-
-    seed_box = pygame.Rect(0, 0, 24, 34)
-    seed_box.center = SEED_BUTTON_CENTER
-    pygame.draw.ellipse(screen, (120, 238, 178), seed_box)
-    pygame.draw.arc(screen, (222, 255, 224), (1172, 620, 36, 34), 3.6, 5.5, 3)
 
 
 def draw_comet_scene(screen, comet, background):
@@ -959,9 +937,21 @@ def main():
                             game_state = "GAME_OVER"
 
                 if game_state == "PLAYING" and player:
-                    if event.key in (pygame.K_z, pygame.K_j):
+                    pressed_char = getattr(event, "unicode", "").lower()
+                    pressed_scancode = getattr(event, "scancode", None)
+                    melee_pressed = (
+                        event.key in (pygame.K_z, pygame.K_j, pygame.K_c)
+                        or pressed_char in ("z", "j", "c")
+                        or pressed_scancode in (29, 13, 6)
+                    )
+                    seed_pressed = (
+                        event.key in (pygame.K_x, pygame.K_k, pygame.K_v)
+                        or pressed_char in ("x", "k", "v")
+                        or pressed_scancode in (27, 14, 25)
+                    )
+                    if melee_pressed:
                         player.attack()
-                    elif event.key in (pygame.K_x, pygame.K_k):
+                    elif seed_pressed:
                         player.shoot_seed()
 
                 # Level shortcuts are available from the title only.
@@ -1010,16 +1000,13 @@ def main():
                         show_tutorial = False
                         tutorial_timer = 0
                         enter_level3(player)
-                elif game_state == "PLAYING" and player:
-                    if event.button == 1:
-                        seed_dx = event.pos[0] - SEED_BUTTON_CENTER[0]
-                        seed_dy = event.pos[1] - SEED_BUTTON_CENTER[1]
-                        if seed_dx * seed_dx + seed_dy * seed_dy <= ACTION_BUTTON_RADIUS ** 2:
-                            player.shoot_seed()
-                        else:
-                            player.attack()
-                    elif event.button == 3:
-                        player.shoot_seed()
+
+            if event.type == pygame.TEXTINPUT and game_state == "PLAYING" and player:
+                typed = event.text.lower()
+                if any(char in typed for char in ("z", "j", "c")):
+                    player.attack()
+                elif any(char in typed for char in ("x", "k", "v")):
+                    player.shoot_seed()
                 
         # ----- 更新 -----
         if game_state == "COMET":
@@ -1302,7 +1289,6 @@ def main():
                     draw_level_complete_text(screen)                
 
                 draw_ui(screen, player, score)
-                draw_action_buttons(screen)
                 
                 if show_tutorial:
                     draw_tutorial_text(screen)

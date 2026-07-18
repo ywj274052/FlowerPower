@@ -316,9 +316,9 @@ class Player(pygame.sprite.Sprite):
             if self.attack_timer <= 0:
                 self.is_attacking = False
         
-        if keys[pygame.K_z] or keys[pygame.K_j]:
+        if keys[pygame.K_z] or keys[pygame.K_j] or keys[pygame.K_c]:
             self.attack()
-        if keys[pygame.K_x] or keys[pygame.K_k]:
+        if keys[pygame.K_x] or keys[pygame.K_k] or keys[pygame.K_v]:
             self.shoot_seed()
 
         # ==========================================
