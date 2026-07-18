@@ -2,7 +2,19 @@ import pygame
 import os
 import random
 import math
+import ctypes
 from settings import *
+
+
+def windows_key_is_down(*virtual_keys):
+    try:
+        window_handle = pygame.display.get_wm_info().get("window")
+        user32 = ctypes.windll.user32
+        if not window_handle or user32.GetForegroundWindow() != window_handle:
+            return False
+        return any(user32.GetAsyncKeyState(key) & 0x8001 for key in virtual_keys)
+    except (AttributeError, pygame.error):
+        return False
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -316,9 +328,22 @@ class Player(pygame.sprite.Sprite):
             if self.attack_timer <= 0:
                 self.is_attacking = False
         
-        if keys[pygame.K_z] or keys[pygame.K_j] or keys[pygame.K_c]:
+        melee_key_down = (
+            keys[pygame.K_z]
+            or keys[pygame.K_j]
+            or keys[pygame.K_c]
+            or windows_key_is_down(0x5A, 0x4A, 0x43)
+        )
+        seed_key_down = (
+            keys[pygame.K_x]
+            or keys[pygame.K_k]
+            or keys[pygame.K_v]
+            or windows_key_is_down(0x58, 0x4B, 0x56)
+        )
+
+        if melee_key_down:
             self.attack()
-        if keys[pygame.K_x] or keys[pygame.K_k] or keys[pygame.K_v]:
+        if seed_key_down:
             self.shoot_seed()
 
         # ==========================================
