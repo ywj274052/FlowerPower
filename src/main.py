@@ -3,6 +3,11 @@ import sys
 import math
 import random
 import os
+
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(errors="replace")
+
 from settings import *
 from player import Player, SeedShot
 from enemy import Level2Scene
@@ -912,15 +917,21 @@ def main():
                     show_tutorial = True
                     tutorial_timer = 0
 
-                if event.key == pygame.K_h and game_state == "PLAYING":
+                if event.key == pygame.K_F8 and game_state == "PLAYING":
                     if player:
                         result = player.take_damage(10)
                         if result == "GAME_OVER":
                             print("💀 玩家死亡！游戏结束！")
                             game_state = "GAME_OVER"
 
-                # Member 2 shortcut: jump directly into Level 2 from title or gameplay.
-                if event.key in (pygame.K_2, pygame.K_KP2) and game_state in ("TITLE", "PLAYING"):
+                if game_state == "PLAYING" and player:
+                    if event.key in (pygame.K_z, pygame.K_j):
+                        player.attack()
+                    elif event.key in (pygame.K_x, pygame.K_k):
+                        player.shoot_seed()
+
+                # Level shortcuts are available from the title only.
+                if event.key in (pygame.K_2, pygame.K_KP2) and game_state == "TITLE":
                     if player is None:
                         player = Player(100, GROUND_Y - 128)
                     game_state = "PLAYING"
@@ -929,7 +940,7 @@ def main():
                     enter_level2(player)
 
                 # Developer shortcut: jump directly into Level 3.
-                if event.key in (pygame.K_3, pygame.K_KP3) and game_state in ("TITLE", "PLAYING"):
+                if event.key in (pygame.K_3, pygame.K_KP3) and game_state == "TITLE":
                     if player is None:
                         player = Player(100, GROUND_Y - 128)
                     game_state = "PLAYING"
@@ -944,6 +955,12 @@ def main():
                     player = Player(100, GROUND_Y - 128)
                     show_tutorial = True
                     tutorial_timer = 0
+
+            if event.type == pygame.MOUSEBUTTONDOWN and game_state == "PLAYING" and player:
+                if event.button == 1:
+                    player.attack()
+                elif event.button == 3:
+                    player.shoot_seed()
                 
         # ----- 更新 -----
         if game_state == "COMET":
