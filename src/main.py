@@ -17,6 +17,13 @@ from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad,
 game_state = "TITLE"
 tutorial_timer = 0 
 show_tutorial = True  
+
+TITLE_START_BUTTON = pygame.Rect(445, 504, 390, 62)
+TITLE_LEVEL2_BUTTON = pygame.Rect(425, 570, 205, 38)
+TITLE_LEVEL3_BUTTON = pygame.Rect(650, 570, 205, 38)
+MELEE_BUTTON_CENTER = (1080, 650)
+SEED_BUTTON_CENTER = (1190, 650)
+ACTION_BUTTON_RADIUS = 42
 portal = None
 show_portal = False
 level1_complete = False
@@ -343,9 +350,17 @@ def draw_title_screen(screen):
     prompt_rect = prompt_text.get_rect(center=prompt_box.center)
     screen.blit(prompt_text, prompt_rect)
 
-    hint_text = small_font.render("2: Level 2 Test    3: Level 3 Test    Esc: Quit", True, (174, 208, 170))
-    hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 588))
-    screen.blit(hint_text, hint_rect)
+    for button_rect, label in (
+        (TITLE_LEVEL2_BUTTON, "Level 2 Test"),
+        (TITLE_LEVEL3_BUTTON, "Level 3 Test"),
+    ):
+        pygame.draw.rect(screen, (10, 56, 32), button_rect, border_radius=6)
+        pygame.draw.rect(screen, (120, 188, 116), button_rect, 2, border_radius=6)
+        button_text = small_font.render(label, True, (210, 238, 204))
+        screen.blit(button_text, button_text.get_rect(center=button_rect.center))
+
+    quit_text = small_font.render("Esc: Quit", True, (174, 208, 170))
+    screen.blit(quit_text, quit_text.get_rect(midleft=(875, 589)))
 
     # Foreground ground strip and flowers frame the screen without feeling empty.
     pygame.draw.rect(screen, (11, 62, 30), (0, SCREEN_HEIGHT - 88, SCREEN_WIDTH, 88))
@@ -376,6 +391,25 @@ def draw_flower(screen, x, y, color, scale=1.0):
     pygame.draw.circle(screen, color, (x, y + offset), petal)
     pygame.draw.circle(screen, color, (x - offset, y), petal)
     pygame.draw.circle(screen, (255, 246, 52), (x, y), center)
+
+
+def draw_action_buttons(screen):
+    for center, border in (
+        (MELEE_BUTTON_CENTER, (255, 215, 92)),
+        (SEED_BUTTON_CENTER, (98, 228, 180)),
+    ):
+        pygame.draw.circle(screen, (13, 48, 38), center, ACTION_BUTTON_RADIUS)
+        pygame.draw.circle(screen, border, center, ACTION_BUTTON_RADIUS, 3)
+
+    melee_box = pygame.Rect(0, 0, 48, 36)
+    melee_box.center = MELEE_BUTTON_CENTER
+    pygame.draw.arc(screen, (255, 235, 150), melee_box, 0.25, 3.0, 5)
+    pygame.draw.circle(screen, (255, 235, 150), (1098, 639), 5)
+
+    seed_box = pygame.Rect(0, 0, 24, 34)
+    seed_box.center = SEED_BUTTON_CENTER
+    pygame.draw.ellipse(screen, (120, 238, 178), seed_box)
+    pygame.draw.arc(screen, (222, 255, 224), (1172, 620, 36, 34), 3.6, 5.5, 3)
 
 
 def draw_comet_scene(screen, comet, background):
@@ -956,11 +990,36 @@ def main():
                     show_tutorial = True
                     tutorial_timer = 0
 
-            if event.type == pygame.MOUSEBUTTONDOWN and game_state == "PLAYING" and player:
-                if event.button == 1:
-                    player.attack()
-                elif event.button == 3:
-                    player.shoot_seed()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if game_state == "TITLE" and event.button == 1:
+                    if TITLE_START_BUTTON.collidepoint(event.pos):
+                        game_state = "COMET"
+                        comet = Comet()
+                        player = Player(100, GROUND_Y - 128)
+                        show_tutorial = True
+                        tutorial_timer = 0
+                    elif TITLE_LEVEL2_BUTTON.collidepoint(event.pos):
+                        player = Player(100, GROUND_Y - 128)
+                        game_state = "PLAYING"
+                        show_tutorial = False
+                        tutorial_timer = 0
+                        enter_level2(player)
+                    elif TITLE_LEVEL3_BUTTON.collidepoint(event.pos):
+                        player = Player(100, GROUND_Y - 128)
+                        game_state = "PLAYING"
+                        show_tutorial = False
+                        tutorial_timer = 0
+                        enter_level3(player)
+                elif game_state == "PLAYING" and player:
+                    if event.button == 1:
+                        seed_dx = event.pos[0] - SEED_BUTTON_CENTER[0]
+                        seed_dy = event.pos[1] - SEED_BUTTON_CENTER[1]
+                        if seed_dx * seed_dx + seed_dy * seed_dy <= ACTION_BUTTON_RADIUS ** 2:
+                            player.shoot_seed()
+                        else:
+                            player.attack()
+                    elif event.button == 3:
+                        player.shoot_seed()
                 
         # ----- 更新 -----
         if game_state == "COMET":
@@ -1243,6 +1302,7 @@ def main():
                     draw_level_complete_text(screen)                
 
                 draw_ui(screen, player, score)
+                draw_action_buttons(screen)
                 
                 if show_tutorial:
                     draw_tutorial_text(screen)
