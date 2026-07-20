@@ -12,6 +12,14 @@ from settings import *
 from player import Player, SeedShot
 from enemy import Level2Scene
 from level3_elements import PoisonGasSystem, ToxicSludge, SwampMoth, PoisonToad, Hecate, BossWarningEffect, BossHealthBar, HitEffect, LevelBanner
+from particle import ParticleEmitter
+from boss import (
+    WitheredKing,
+    BossRoomCutscene,
+    WitheredKingHealthBar,
+    draw_win_screen,
+    draw_garden_arena_background,
+)
 
 # ---------- 全局变量 ----------
 game_state = "TITLE"
@@ -896,6 +904,40 @@ def main():
     # Member 3: 初始化关卡开场字样横幅
     level_banner = LevelBanner("Level 3", 1280)
 
+    # Member 4: Level 4 - Ancient Garden Arena.
+    particle_emitter = ParticleEmitter()
+    boss_projectiles = pygame.sprite.Group()
+    level4_boss = None
+    level4_cutscene = None
+    win_boss_ui = WitheredKingHealthBar()
+
+    def enter_level4(player_obj):
+        nonlocal level4_boss, level4_cutscene
+        global current_level, GROUND_Y, camera_locked, current_wave, level_progress
+
+        current_level = 4
+        print("Level 4 loaded: Ancient Garden Arena - The Withered King")
+        play_level_bgm(4)
+
+        GROUND_Y = SCREEN_HEIGHT - GROUND_HEIGHT
+        if player_obj:
+            player_obj.rect.midbottom = (60, GROUND_Y)
+            player_obj.ground_y = GROUND_Y
+
+        camera_locked = True
+        current_wave = 0
+        level_progress = 0
+        enemies.empty()
+        particle_emitter.clear()
+        boss_projectiles.empty()
+
+        level4_boss = WitheredKing(SCREEN_WIDTH // 2, GROUND_Y)
+        level4_cutscene = BossRoomCutscene(
+            walk_target_x=SCREEN_WIDTH * 0.3,
+            relic_x=SCREEN_WIDTH // 2,
+            ground_y=GROUND_Y,
+        )
+
     def enter_level2(player_obj):
         global current_level, GROUND_Y, camera_locked, current_wave, level_progress
         current_level = 2
@@ -959,6 +1001,13 @@ def main():
                     show_tutorial = True
                     tutorial_timer = 0
 
+                if game_state == "WIN" and event.key == pygame.K_r:
+                    game_state = "TITLE"
+                    player = None
+                    comet = None
+                    show_tutorial = True
+                    tutorial_timer = 0
+
                 if event.key == pygame.K_F8 and game_state == "PLAYING":
                     if player:
                         result = player.take_damage(10)
@@ -1001,6 +1050,15 @@ def main():
                     show_tutorial = False
                     tutorial_timer = 0
                     enter_level3(player)
+
+                # Developer shortcut: jump directly into Level 4.
+                if event.key in (pygame.K_4, pygame.K_KP4) and game_state == "TITLE":
+                    if player is None:
+                        player = Player(100, GROUND_Y - 128)
+                    game_state = "PLAYING"
+                    show_tutorial = False
+                    tutorial_timer = 0
+                    enter_level4(player)
                 
                 if game_state == "TITLE" and event.key == pygame.K_RETURN:
                     print("☄️ 彗星坠落事件启动！")
@@ -1073,7 +1131,12 @@ def main():
         
         elif game_state == "PLAYING":
             if player:
-                player.update()
+                if current_level == 4 and level4_cutscene and level4_cutscene.player_locked:
+                    pre_x = player.rect.x
+                    player.update()
+                    player.rect.x = pre_x
+                else:
+                    player.update()
 
                 if current_level == 1:
                     keys = pygame.key.get_pressed()
@@ -1177,6 +1240,7 @@ def main():
 
                             current_wave += 1
                             if current_wave > 4:
+                                enter_level4(player)
                                 print("沼泽区域完全肃清！准备进入下一关！")
                             else:
                                 print("区域肃清！屏幕解锁，继续前进！")
@@ -1184,6 +1248,65 @@ def main():
                     # 当第一张图完全移出左侧屏幕 (-1280) 时，重置坐标实现无限循环
                     if bg_x <= -1280:
                         bg_x = 0
+
+                if current_level == 4 and level4_boss is not None:
+                    if level4_cutscene and not level4_cutscene.is_done:
+                        level4_cutscene.update(player, level4_boss, particle_emitter)
+
+                    boss_event = level4_boss.update(player, particle_emitter)
+
+                    fired = level4_boss.pop_projectile()
+                    if fired:
+                        boss_projectiles.add(fired)
+                    boss_projectiles.update()
+
+                    for projectile in list(boss_projectiles):
+                        if projectile.rect.colliderect(player.rect):
+                            player.take_damage(12)
+                            projectile.kill()
+
+                    if level4_boss.state in (WitheredKing.PHASE1, WitheredKing.PHASE2):
+                        if player.is_attacking:
+                            hitbox = player.create_attack_hitbox()
+                            if hitbox.colliderect(level4_boss.rect):
+                                level4_boss.take_damage(VINE_WHIP_DAMAGE)
+                                particle_emitter.emit(
+                                    level4_boss.rect.centerx,
+                                    level4_boss.rect.centery,
+                                    count=15,
+                                    color=(120, 200, 140),
+                                    lifetime=20,
+                                    size=3,
+                                    speed_range=(1, 3),
+                                )
+
+                        for seed in player.seed_shots[:]:
+                            if seed.rect.colliderect(level4_boss.rect):
+                                level4_boss.take_damage(SEED_SHOT_DAMAGE)
+                                particle_emitter.emit(
+                                    seed.rect.centerx,
+                                    seed.rect.centery,
+                                    count=15,
+                                    color=(120, 200, 140),
+                                    lifetime=20,
+                                    size=3,
+                                    speed_range=(1, 3),
+                                )
+                                if seed in player.seed_shots:
+                                    player.seed_shots.remove(seed)
+
+                    if boss_event == "PHASE2":
+                        print("The Withered King enters Phase 2!")
+                    elif boss_event == "DEFEATED":
+                        print("The Withered King has fallen!")
+
+                    particle_emitter.update()
+
+                    if level4_boss.state == WitheredKing.DEAD and getattr(
+                        level4_boss, "death_complete", False
+                    ):
+                        score += 100
+                        game_state = "WIN"
                 
                 if show_tutorial:
                     tutorial_timer += 1
@@ -1211,8 +1334,12 @@ def main():
             draw_flower_grow_animation(screen, flower_timer)
         
         elif game_state == "PLAYING":
-            screen.blit(background, (0, 0))
-            pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
+            if current_level == 4:
+                arena_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                draw_garden_arena_background(arena_surf)
+            else:
+                screen.blit(background, (0, 0))
+                pygame.draw.rect(screen, GREEN, (0, GROUND_Y, SCREEN_WIDTH, GROUND_HEIGHT))
 
             # Member 2: Dark Forest scene.
             if current_level == 2:
@@ -1240,6 +1367,18 @@ def main():
                 hit_effects.draw(screen)
             
             if player:
+                if current_level == 4 and level4_boss is not None:
+                    if level4_cutscene:
+                        level4_cutscene.draw(arena_surf)
+                    boss_projectiles.draw(arena_surf)
+                    level4_boss.draw(arena_surf)
+                    level4_boss.draw_glowing_cap(arena_surf, particle_emitter)
+                    particle_emitter.draw(arena_surf)
+
+                    shake_x, shake_y = level4_boss.shake.offset
+                    screen.blit(arena_surf, (shake_x, shake_y))
+                    level4_boss.phase_flash.draw(screen)
+
                 for seed in player.seed_shots:
                     seed.draw_trail(screen)
                 for seed in player.seed_shots:
@@ -1329,6 +1468,14 @@ def main():
             if player:
                 screen.blit(player.image, player.rect)
             draw_game_over_screen(screen, player)
+
+        elif game_state == "WIN":
+            draw_garden_arena_background(screen)
+            particle_emitter.update()
+            particle_emitter.draw(screen)
+            if player:
+                screen.blit(player.image, player.rect)
+            draw_win_screen(screen, score)
         
         # 更新并绘制全屏毒气特效
         poison_gas.update(player)
@@ -1340,6 +1487,9 @@ def main():
         # 2. 渲染 Boss 血条
         if active_boss and not active_boss.is_dead:
             boss_ui.draw(screen, active_boss)
+
+        if current_level == 4 and level4_boss is not None and game_state == "PLAYING":
+            win_boss_ui.draw(screen, level4_boss)
 
         pygame.display.flip()
         clock.tick(FPS)
