@@ -1184,11 +1184,11 @@ def main():
                             poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x + 600, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 1600, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 1800, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x + 600, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x - 1600, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x - 1800, VISUAL_GROUND))
                         
                         elif level_progress >= 1600 and current_wave == 2:
                             camera_locked = True
@@ -1196,11 +1196,11 @@ def main():
                             poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
-                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
-                            enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 250))
-                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 350))
+                            #enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
+                            #enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 150))
+                            #enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 250))
+                            #enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 350))
                         
                         elif level_progress >= 2400 and current_wave == 3:
                             camera_locked = True
@@ -1208,14 +1208,14 @@ def main():
                             poison_gas.start_wave()  # 开启本波毒气 10 秒倒计时
 
                             enemies.add(ToxicSludge(player.rect.x + 200, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
-                            enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
-                            enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 130))
-                            enemies.add(SwampMoth(player.rect.x + 500, VISUAL_GROUND - 170))
-                            enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 210))
-                            enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 250))
-                            enemies.add(PoisonToad(player.rect.x + 250, VISUAL_GROUND))
-                            enemies.add(PoisonToad(player.rect.x - 1450, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x + 400, VISUAL_GROUND))
+                            #enemies.add(ToxicSludge(player.rect.x - 1300, VISUAL_GROUND))
+                            #enemies.add(SwampMoth(player.rect.x + 300, VISUAL_GROUND - 130))
+                            #enemies.add(SwampMoth(player.rect.x + 500, VISUAL_GROUND - 170))
+                            #enemies.add(SwampMoth(player.rect.x - 1400, VISUAL_GROUND - 210))
+                            #enemies.add(SwampMoth(player.rect.x - 1600, VISUAL_GROUND - 250))
+                            #enemies.add(PoisonToad(player.rect.x + 250, VISUAL_GROUND))
+                            #enemies.add(PoisonToad(player.rect.x - 1450, VISUAL_GROUND))
                         
                         elif level_progress >= 3200 and current_wave == 4:
                             camera_locked = True

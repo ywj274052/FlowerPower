@@ -50,7 +50,7 @@ class PoisonGasSystem:
                 player.hp += self.damage_accumulated
                 if hasattr(player, 'max_hp') and player.hp > player.max_hp:
                     player.hp = player.max_hp
-                print(f"✨ 毒气消散！系统为您返还了 {self.damage_accumulated} 点生命值！")
+                print(f"毒气消散！系统为您返还了 {self.damage_accumulated} 点生命值！")
             
             self.active = False
             self.gas_released = False
@@ -67,7 +67,7 @@ class PoisonGasSystem:
                 self.gas_released = True
                 self.gas_duration_timer = 0
                 self.damage_tick_timer = 0
-                print("☣️ 警告！全屏毒气开始释放，持续 10 秒！")
+                print("警告！全屏毒气开始释放，持续 10 秒！")
                 
         # Phase 2: During the gas eruption 
         else:
@@ -88,7 +88,7 @@ class PoisonGasSystem:
                     damage = 3
                     player.hp -= damage   
                     self.damage_accumulated += damage
-                    print(f"🤢 吸入毒气！失去 3 点生命... (已累计失去 {self.damage_accumulated} 点)")
+                    print(f"吸入毒气！失去 3 点生命... (已累计失去 {self.damage_accumulated} 点)")
                     
                     player.is_hurt = True
                     if hasattr(player, 'hurt_timer'): player.hurt_timer = 30
@@ -109,7 +109,7 @@ class PoisonGasSystem:
 # ==========================================
 
 class ToxicSludge(pygame.sprite.Sprite):
-    """怪物 1: 兽人步兵 (分离式 PNG 动画加载)"""
+    #怪物1
     def __init__(self, x, y):
         super().__init__()
         
@@ -150,12 +150,10 @@ class ToxicSludge(pygame.sprite.Sprite):
             self.state = 'dead'
             self.frame_index = 0
             
-            # 极其巧妙的一步：把物理碰撞框长宽设为 0！
-            # 这样既能让尸体继续画在原地，又不会变成挡住子弹的“肉盾”
             self.rect.width = 0
             self.rect.height = 0
             
-            return # 强行 return，拦截指令，不执行真实的删除操作！
+            return 
 
         if hasattr(self, 'dead_timer') and self.dead_timer >= 120:
             super().kill()
@@ -245,7 +243,7 @@ class ToxicSludge(pygame.sprite.Sprite):
     def update(self, player):
         # 1. 受击判定
         if self.hp < self.last_hp and not self.is_dead:
-            self.show_hp_timer = 300  # 【新增】受到伤害，重置为 300 帧 (5秒)
+            self.show_hp_timer = 300  # 受到伤害，重置为 300 帧 (5秒)
             if self.hp <= 0:
                 self.is_dead = True
                 self.state = 'dead'
@@ -296,8 +294,6 @@ class ToxicSludge(pygame.sprite.Sprite):
             self.has_dealt_damage = True
 
     def draw_health_bar(self, screen):
-        """绘制头顶动态血条 (受击后显示 5 秒)"""
-        # 如果还没死，并且计时器大于 0，才绘制
         if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
             self.show_hp_timer -= 1  # 倒计时流逝
             
@@ -323,7 +319,6 @@ class ToxicSludge(pygame.sprite.Sprite):
 # 怪物 2：蓝火法师
 # ----------------------------------------------------
 class MothSpike(pygame.sprite.Sprite):
-    """法师发射的炫酷幽蓝魔法球 (修复了外太空逃逸Bug)"""
     def __init__(self, x, y, target_x, target_y):
         super().__init__()
         
@@ -526,7 +521,6 @@ class SwampMoth(pygame.sprite.Sprite):
                 self.has_shot = True
 
     def draw_health_bar(self, screen):
-        # 如果还没死，并且计时器大于 0，才绘制
         if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
             self.show_hp_timer -= 1  # 倒计时流逝
             
@@ -549,7 +543,7 @@ class SwampMoth(pygame.sprite.Sprite):
         self.update_animation()
 
 # ----------------------------------------------------
-# 怪物 3：跳跃突击者 (绿皮地精 / 抛物线精准制导扑击)
+# 怪物 3：跳跃突击者 
 # ----------------------------------------------------
 class PoisonToad(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -688,7 +682,7 @@ class PoisonToad(pygame.sprite.Sprite):
             self.last_hp = self.hp
 
         if not self.is_hurt:
-            # 物理引擎升级：加入水平速度 vx 的抛物线控制
+            # 加入水平速度 vx 的抛物线控制
             self.vy += 1.0
             self.rect.y += self.vy
             
@@ -726,20 +720,19 @@ class PoisonToad(pygame.sprite.Sprite):
                             self.jump_timer += 1
                             if self.jump_timer > 90:  
                                 
-                                # 1. 目标不是玩家的正中心，而是玩家“身前”的一点点距离，防穿模
                                 target_x = player.rect.centerx
                                 if target_x > self.rect.centerx:
                                     target_x -= 40
                                 else:
                                     target_x += 40
                                     
-                                # 2. 计算需要跨越的总距离 dx
+                                # 计算需要跨越的总距离 dx
                                 dx = target_x - self.rect.centerx
                                 
-                                # 3. 根据重力系统反推滞空时间 
+                                # 根据重力系统反推滞空时间 
                                 air_time = 24
                                 
-                                # 4. 速度 = 距离 / 时间
+                                # 速度 = 距离 / 时间
                                 self.vx = dx / air_time
                                 
                                 self.vy = self.jump_force   
@@ -757,7 +750,6 @@ class PoisonToad(pygame.sprite.Sprite):
             self.has_dealt_damage = True
 
     def draw_health_bar(self, screen):
-        # 如果还没死，并且计时器大于 0，才绘制
         if getattr(self, 'show_hp_timer', 0) > 0 and not self.is_dead:
             self.show_hp_timer -= 1  # 倒计时流逝
             
@@ -1199,7 +1191,7 @@ class BossWarningEffect:
             self.active = False
 
 # ==========================================
-# Boss 半血大招：全屏深粉色毒气系统 (带锁血保护)
+# Boss 半血大招：全屏深粉色毒气系统 
 # ==========================================
 class BossPoisonGasSystem:
     def __init__(self, screen_width=1280, screen_height=720):
@@ -1272,7 +1264,7 @@ class BossPoisonGasSystem:
 
 
 # ----------------------------------------------------
-# Boss 专属 UI (结合了动态头像与毒气渲染黑科技)
+# Boss 专属 UI 
 # ----------------------------------------------------
 class BossHealthBar:
     def __init__(self):
@@ -1317,7 +1309,7 @@ class BossHealthBar:
             pygame.draw.rect(screen, (220, 20, 60), hp_rect)
 
 # ==========================================
-# 战斗视觉特效：受击十字闪光 (Hit Spark)
+# 战斗视觉特效：受击十字闪光
 # ==========================================
 class HitEffect(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -1360,7 +1352,7 @@ class HitEffect(pygame.sprite.Sprite):
             pygame.draw.circle(self.image, (255, 255, 255, alpha), (center, center), core_radius)
 
 # ==========================================
-# 关卡开场文字横幅 (渐变特效)
+# 关卡开场文字横幅 
 # ==========================================
 class LevelBanner:
     def __init__(self, text="Level 3", screen_width=1280):
